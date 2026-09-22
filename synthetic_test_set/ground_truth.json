@@ -1,0 +1,362 @@
+[
+  {
+    "file": "email_client_01.png",
+    "category": "EMAIL_CLIENT",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "EMAIL",
+        "text": "arun.kumar92@gmail.com"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "+91 9845123456"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "arunkumar@okhdfcbank"
+      }
+    ]
+  },
+  {
+    "file": "email_client_02.png",
+    "category": "EMAIL_CLIENT",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "EMAIL",
+        "text": "support.desk@enterprise-saas.com"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "9876543210"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "billing.dept@paytm"
+      }
+    ]
+  },
+  {
+    "file": "email_client_03.png",
+    "category": "EMAIL_CLIENT",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "EMAIL",
+        "text": "vendor.settlement@logistics-india.org"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "+91 7890123456"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "logistics.ops@ybl"
+      }
+    ]
+  },
+  {
+    "file": "email_client_04.png",
+    "category": "EMAIL_CLIENT",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "EMAIL",
+        "text": "hr.connect@techcorp.in"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "8765432109"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "vikram.aditya@okaxis"
+      }
+    ]
+  },
+  {
+    "file": "kyc_onboarding_01.png",
+    "category": "KYC_FORM",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "PAN",
+        "text": "ABCDE1234F"
+      },
+      {
+        "pii_type": "AADHAAR",
+        "text": "9876 5432 1012"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "+91 9123456789"
+      }
+    ]
+  },
+  {
+    "file": "kyc_onboarding_02.png",
+    "category": "KYC_FORM",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "PAN",
+        "text": "BKZPR9876Q"
+      },
+      {
+        "pii_type": "AADHAAR",
+        "text": "5432 1678 9012"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "9988776655"
+      }
+    ]
+  },
+  {
+    "file": "kyc_onboarding_03.png",
+    "category": "KYC_FORM",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "PAN",
+        "text": "FGHIJ5678K"
+      },
+      {
+        "pii_type": "AADHAAR",
+        "text": "3456 7890 1238"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "+91 8765432100"
+      }
+    ]
+  },
+  {
+    "file": "kyc_onboarding_04.png",
+    "category": "KYC_FORM",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "PAN",
+        "text": "KLMNO9012Z"
+      },
+      {
+        "pii_type": "AADHAAR",
+        "text": "7890 1234 5674"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "7012345678"
+      }
+    ]
+  },
+  {
+    "file": "banking_dashboard_01.png",
+    "category": "BANKING_DASHBOARD",
+    "is_clean": false,
+    "ground_truth_count": 4,
+    "ground_truth_items": [
+      {
+        "pii_type": "IFSC",
+        "text": "HDFC0001234"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "treasury.ops@okhdfcbank"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "corp.treasury@hdfc-client.com"
+      },
+      {
+        "pii_type": "CARD_NUMBER",
+        "text": "4532 1488 2538 9303"
+      }
+    ]
+  },
+  {
+    "file": "banking_dashboard_02.png",
+    "category": "BANKING_DASHBOARD",
+    "is_clean": false,
+    "ground_truth_count": 4,
+    "ground_truth_items": [
+      {
+        "pii_type": "IFSC",
+        "text": "SBIN0004321"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "merchant.settle@oksbi"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "settlements@sbi-merchants.in"
+      },
+      {
+        "pii_type": "CARD_NUMBER",
+        "text": "5241 9493 6035 0181"
+      }
+    ]
+  },
+  {
+    "file": "banking_dashboard_03.png",
+    "category": "BANKING_DASHBOARD",
+    "is_clean": false,
+    "ground_truth_count": 4,
+    "ground_truth_items": [
+      {
+        "pii_type": "IFSC",
+        "text": "ICIC0000987"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "payroll.support@okicici"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "infinity.help@icicibank.com"
+      },
+      {
+        "pii_type": "CARD_NUMBER",
+        "text": "4111 2688 5672 4902"
+      }
+    ]
+  },
+  {
+    "file": "banking_dashboard_04.png",
+    "category": "BANKING_DASHBOARD",
+    "is_clean": false,
+    "ground_truth_count": 4,
+    "ground_truth_items": [
+      {
+        "pii_type": "IFSC",
+        "text": "UTIB0000456"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "direct.payout@axisbank"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "clearing.house@axis-portal.org"
+      },
+      {
+        "pii_type": "CARD_NUMBER",
+        "text": "6011 3213 9664 3086"
+      }
+    ]
+  },
+  {
+    "file": "chat_support_01.png",
+    "category": "CHAT_SUPPORT",
+    "is_clean": false,
+    "ground_truth_count": 4,
+    "ground_truth_items": [
+      {
+        "pii_type": "PHONE_IN",
+        "text": "+91 9840123456"
+      },
+      {
+        "pii_type": "UPI_ID",
+        "text": "priya99@okaxis"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "priya.nair@sampledomain.com"
+      },
+      {
+        "pii_type": "IFSC",
+        "text": "UTIB0000123"
+      }
+    ]
+  },
+  {
+    "file": "chat_support_02.png",
+    "category": "CHAT_SUPPORT",
+    "is_clean": false,
+    "ground_truth_count": 2,
+    "ground_truth_items": [
+      {
+        "pii_type": "PHONE_IN",
+        "text": "9444012345"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "sneha.b@webmail.in"
+      }
+    ]
+  },
+  {
+    "file": "chat_support_03.png",
+    "category": "CHAT_SUPPORT",
+    "is_clean": false,
+    "ground_truth_count": 2,
+    "ground_truth_items": [
+      {
+        "pii_type": "PAN",
+        "text": "CDEFG5678H"
+      },
+      {
+        "pii_type": "AADHAAR",
+        "text": "456789012341"
+      }
+    ]
+  },
+  {
+    "file": "chat_support_04.png",
+    "category": "CHAT_SUPPORT",
+    "is_clean": false,
+    "ground_truth_count": 3,
+    "ground_truth_items": [
+      {
+        "pii_type": "CARD_NUMBER",
+        "text": "4222038902275852"
+      },
+      {
+        "pii_type": "PHONE_IN",
+        "text": "+91 9820012345"
+      },
+      {
+        "pii_type": "EMAIL",
+        "text": "deepak.k@cloudmail.org"
+      }
+    ]
+  },
+  {
+    "file": "clean_analytics_01.png",
+    "category": "CLEAN",
+    "is_clean": true,
+    "ground_truth_count": 0,
+    "ground_truth_items": []
+  },
+  {
+    "file": "clean_code_editor_02.png",
+    "category": "CLEAN",
+    "is_clean": true,
+    "ground_truth_count": 0,
+    "ground_truth_items": []
+  },
+  {
+    "file": "clean_docs_page_03.png",
+    "category": "CLEAN",
+    "is_clean": true,
+    "ground_truth_count": 0,
+    "ground_truth_items": []
+  },
+  {
+    "file": "clean_settings_04.png",
+    "category": "CLEAN",
+    "is_clean": true,
+    "ground_truth_count": 0,
+    "ground_truth_items": []
+  }
+]
