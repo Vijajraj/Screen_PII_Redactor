@@ -4,19 +4,14 @@ Phase 1 — Screen PII Redactor (Snapdragon AI Lab Challenge)
 """
 
 import os
-import pytest
-import numpy as np
+
 import onnx
-from inference_wrapper import (
-    resolve_execution_providers,
-    TARGET_PROVIDER_PRIORITY,
-    PPOCRv4Detector,
-    ScreenPIIPipeline
-)
+
+from inference_wrapper import TARGET_PROVIDER_PRIORITY, PPOCRv4Detector, ScreenPIIPipeline, resolve_execution_providers
 
 
 def test_execution_provider_resolution_and_fallback():
-    providers, meta = resolve_execution_providers()
+    _providers, meta = resolve_execution_providers()
     assert meta["requested_priority"] == TARGET_PROVIDER_PRIORITY
     assert "CPUExecutionProvider" in meta["selected_providers"]
     assert meta["primary_provider"] == "CPUExecutionProvider"
@@ -26,7 +21,7 @@ def test_execution_provider_resolution_and_fallback():
 def test_quantized_model_file_and_static_shape():
     model_path = "detector_quantized.onnx"
     assert os.path.exists(model_path)
-    
+
     m = onnx.load(model_path)
     inputs = m.graph.input
     assert len(inputs) == 1
@@ -37,12 +32,13 @@ def test_quantized_model_file_and_static_shape():
 def test_detector_inference_on_synthetic_screenshot():
     detector = PPOCRv4Detector(model_path="detector_quantized.onnx")
     assert detector.provider_metadata["primary_provider"] == "CPUExecutionProvider"
-    
+
     # Run on sample synthetic screenshot
     test_img_path = "synthetic_test_set/kyc_onboarding_01.png"
     assert os.path.exists(test_img_path)
-    
+
     import cv2
+
     img = cv2.imread(test_img_path)
     boxes = detector.detect(img)
     assert len(boxes) > 0
@@ -59,7 +55,7 @@ def test_pipeline_on_clean_image():
     pipeline = ScreenPIIPipeline()
     clean_img_path = "synthetic_test_set/clean_analytics_01.png"
     assert os.path.exists(clean_img_path)
-    
+
     res = pipeline.run_on_image(clean_img_path)
     assert res["execution_provider"] == "CPUExecutionProvider"
     assert "detected_text_regions" in res

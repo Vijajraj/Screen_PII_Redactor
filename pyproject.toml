@@ -1,0 +1,57 @@
+[project]
+name = "screen-pii-redactor"
+version = "0.1.0"
+description = "On-device Indian-format PII detection and redaction for the Snapdragon AI Lab Challenge"
+requires-python = ">=3.10"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+fix = true
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "S",      # bandit (security)
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "T20",    # flake8-print (warn on print statements)
+    "RUF",    # ruff-specific rules
+]
+ignore = [
+    "T201",   # print() usage -- acceptable in CLI scripts and self-tests
+    "S311",   # random -- not for crypto, used in synthetic test generation
+    "E501",   # line too long -- managed by line-length above
+    "S101",   # assert -- used in tests
+    "S603",   # subprocess call -- evaluate_pipeline test needs it
+    "S607",   # partial executable path in subprocess
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S311"]
+"generate_synthetic_data.py" = ["T201", "S311"]
+"evaluate_pipeline.py" = ["T201"]
+"build_notebook.py" = ["T201"]
+"setup_models.py" = ["T201"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+check_untyped_defs = true
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m not slow')",
+]
+addopts = "-v --tb=short"

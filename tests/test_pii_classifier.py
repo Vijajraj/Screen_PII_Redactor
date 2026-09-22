@@ -3,20 +3,12 @@ test_pii_classifier.py — Unit tests for pii_classifier.py
 Phase 1 — Screen PII Redactor (Snapdragon AI Lab Challenge)
 """
 
-import pytest
-from pii_classifier import (
-    validate_verhoeff,
-    generate_verhoeff,
-    validate_luhn,
-    generate_luhn,
-    classify_text,
-    KNOWN_UPI_HANDLES
-)
-
+from pii_classifier import classify_text, generate_luhn, generate_verhoeff, validate_luhn, validate_verhoeff
 
 # =====================================================================
 # 1. VERHOEFF ALGORITHM TESTS
 # =====================================================================
+
 
 def test_verhoeff_checksum_generation_and_validation():
     # Test generation from arbitrary 11 digits
@@ -39,6 +31,7 @@ def test_verhoeff_checksum_generation_and_validation():
 # 2. LUHN ALGORITHM TESTS
 # =====================================================================
 
+
 def test_luhn_checksum_generation_and_validation():
     prefixes = ["4532", "5241", "4111", "6011", "3782"]
     for prefix in prefixes:
@@ -54,6 +47,7 @@ def test_luhn_checksum_generation_and_validation():
 # =====================================================================
 # 3. PII CLASSIFICATION TESTS
 # =====================================================================
+
 
 def test_classify_aadhaar():
     valid_aadhaar = generate_verhoeff("98765432101")

@@ -13,33 +13,36 @@ Section 4 Specification:
 - Generates pixel-accurate images and records ground-truth JSON annotations.
 """
 
-import os
 import json
-import random
-from typing import List, Dict, Any
+import os
+from typing import Any
+
 from PIL import Image, ImageDraw, ImageFont
 
-from pii_classifier import generate_verhoeff, generate_luhn
+from pii_classifier import generate_luhn, generate_verhoeff
 
 OUTPUT_DIR = "synthetic_test_set"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 
 # Helper to get standard fonts safely
 def get_font(size: int, bold: bool = False):
     try:
         font_name = "arialbd.ttf" if bold else "arial.ttf"
         return ImageFont.truetype(font_name, size)
-    except IOError:
+    except OSError:
         try:
             return ImageFont.truetype("DejaVuSans.ttf", size)
-        except IOError:
+        except OSError:
             return ImageFont.load_default()
+
 
 FONT_TITLE = get_font(22, bold=True)
 FONT_HEADING = get_font(18, bold=True)
 FONT_BODY = get_font(16, bold=False)
 FONT_BOLD = get_font(16, bold=True)
 FONT_SMALL = get_font(13, bold=False)
+
 
 def draw_window_frame(draw: ImageDraw.ImageDraw, width: int, height: int, title: str, bg_color=(245, 247, 250)):
     # Canvas background
@@ -53,7 +56,10 @@ def draw_window_frame(draw: ImageDraw.ImageDraw, width: int, height: int, title:
     # Window title
     draw.text((85, 10), title, font=FONT_HEADING, fill=(241, 245, 249))
 
-def draw_card(draw: ImageDraw.ImageDraw, x1: int, y1: int, x2: int, y2: int, fill=(255, 255, 255), outline=(226, 232, 240)):
+
+def draw_card(
+    draw: ImageDraw.ImageDraw, x1: int, y1: int, x2: int, y2: int, fill=(255, 255, 255), outline=(226, 232, 240)
+):
     draw.rounded_rectangle([x1, y1, x2, y2], radius=8, fill=fill, outline=outline, width=1)
 
 
@@ -61,9 +67,10 @@ def draw_card(draw: ImageDraw.ImageDraw, x1: int, y1: int, x2: int, y2: int, fil
 # DATA GENERATORS
 # =====================================================================
 
-def create_synthetic_datasets() -> List[Dict[str, Any]]:
+
+def create_synthetic_datasets() -> list[dict[str, Any]]:
     test_cases = []
-    
+
     # -------------------------------------------------------------
     # 1. EMAIL CLIENTS (4 images)
     # -------------------------------------------------------------
@@ -83,8 +90,8 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "Direct Mobile: +91 9845123456",
                 "Official Email: arun.kumar92@gmail.com",
                 "Thanks & Regards,",
-                "Arun Kumar S — Lead Cloud Architect"
-            ]
+                "Arun Kumar S — Lead Cloud Architect",
+            ],
         },
         {
             "name": "email_client_02.png",
@@ -100,8 +107,8 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "UPI Payment: billing.dept@paytm",
                 "Helpline Support: 9876543210",
                 "Escalation Email: support.desk@enterprise-saas.com",
-                "Thank you for choosing Enterprise SaaS."
-            ]
+                "Thank you for choosing Enterprise SaaS.",
+            ],
         },
         {
             "name": "email_client_03.png",
@@ -117,8 +124,8 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "Operations Cell: +91 7890123456",
                 "Dispute UPI Handle: logistics.ops@ybl",
                 "Official Helpdesk: vendor.settlement@logistics-india.org",
-                "Please acknowledge receipt."
-            ]
+                "Please acknowledge receipt.",
+            ],
         },
         {
             "name": "email_client_04.png",
@@ -133,18 +140,13 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "Designated POC Phone: 8765432109",
                 "HR Representative Email: hr.connect@techcorp.in",
                 "Direct UPI Verification: vikram.aditya@okaxis",
-                "Best regards, Human Resources Division"
-            ]
-        }
+                "Best regards, Human Resources Division",
+            ],
+        },
     ]
-    
+
     for sc in email_scenarios:
-        test_cases.append({
-            "category": "EMAIL_CLIENT",
-            "file": sc["name"],
-            "title": sc["title"],
-            "scenario": sc
-        })
+        test_cases.append({"category": "EMAIL_CLIENT", "file": sc["name"], "title": sc["title"], "scenario": sc})
 
     # -------------------------------------------------------------
     # 2. KYC / ONBOARDING FORMS (4 images)
@@ -157,7 +159,7 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "aadhaar": generate_verhoeff("98765432101"),  # 987654321012
             "phone": "+91 9123456789",
             "name_val": "Rajesh Ramanathan",
-            "dob": "14/08/1990"
+            "dob": "14/08/1990",
         },
         {
             "name": "kyc_onboarding_02.png",
@@ -166,7 +168,7 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "aadhaar": generate_verhoeff("54321678901"),  # 543216789018
             "phone": "9988776655",
             "name_val": "Ananya Mukherjee",
-            "dob": "02/11/1988"
+            "dob": "02/11/1988",
         },
         {
             "name": "kyc_onboarding_03.png",
@@ -175,7 +177,7 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "aadhaar": generate_verhoeff("34567890123"),  # 345678901235
             "phone": "+91 8765432100",
             "name_val": "Siddharth Verma",
-            "dob": "25/04/1995"
+            "dob": "25/04/1995",
         },
         {
             "name": "kyc_onboarding_04.png",
@@ -184,16 +186,11 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "aadhaar": generate_verhoeff("78901234567"),
             "phone": "7012345678",
             "name_val": "Kavitha Sundaram",
-            "dob": "19/09/1984"
-        }
+            "dob": "19/09/1984",
+        },
     ]
     for sc in kyc_scenarios:
-        test_cases.append({
-            "category": "KYC_FORM",
-            "file": sc["name"],
-            "title": sc["title"],
-            "scenario": sc
-        })
+        test_cases.append({"category": "KYC_FORM", "file": sc["name"], "title": sc["title"], "scenario": sc})
 
     # -------------------------------------------------------------
     # 3. BANKING DASHBOARDS (4 images)
@@ -206,7 +203,7 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "card": generate_luhn("4532", 16),
             "upi": "treasury.ops@okhdfcbank",
             "email": "corp.treasury@hdfc-client.com",
-            "bank_name": "HDFC Bank Ltd, Nariman Point Branch"
+            "bank_name": "HDFC Bank Ltd, Nariman Point Branch",
         },
         {
             "name": "banking_dashboard_02.png",
@@ -215,7 +212,7 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "card": generate_luhn("5241", 16),
             "upi": "merchant.settle@oksbi",
             "email": "settlements@sbi-merchants.in",
-            "bank_name": "State Bank of India, MG Road Bangalore"
+            "bank_name": "State Bank of India, MG Road Bangalore",
         },
         {
             "name": "banking_dashboard_03.png",
@@ -224,7 +221,7 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "card": generate_luhn("4111", 16),
             "upi": "payroll.support@okicici",
             "email": "infinity.help@icicibank.com",
-            "bank_name": "ICICI Bank, Bandra Kurla Complex"
+            "bank_name": "ICICI Bank, Bandra Kurla Complex",
         },
         {
             "name": "banking_dashboard_04.png",
@@ -233,16 +230,11 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
             "card": generate_luhn("6011", 16),
             "upi": "direct.payout@axisbank",
             "email": "clearing.house@axis-portal.org",
-            "bank_name": "Axis Bank Ltd, Connaught Place New Delhi"
-        }
+            "bank_name": "Axis Bank Ltd, Connaught Place New Delhi",
+        },
     ]
     for sc in banking_scenarios:
-        test_cases.append({
-            "category": "BANKING_DASHBOARD",
-            "file": sc["name"],
-            "title": sc["title"],
-            "scenario": sc
-        })
+        test_cases.append({"category": "BANKING_DASHBOARD", "file": sc["name"], "title": sc["title"], "scenario": sc})
 
     # -------------------------------------------------------------
     # 4. CHAT / SUPPORT TICKETS (4 images)
@@ -256,14 +248,14 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 ("Finance Rep [10:15 AM]", "Understood. Please send customer contact and UPI ID."),
                 ("Lead Ops [10:16 AM]", "Customer phone is +91 9840123456 and UPI is priya99@okaxis"),
                 ("Finance Rep [10:17 AM]", "Got it. Registered email on record: priya.nair@sampledomain.com"),
-                ("Finance Rep [10:18 AM]", "Processing reversal via IFSC UTIB0000123.")
+                ("Finance Rep [10:18 AM]", "Processing reversal via IFSC UTIB0000123."),
             ],
             "pii_items": [
                 ("+91 9840123456", "PHONE_IN"),
                 ("priya99@okaxis", "UPI_ID"),
                 ("priya.nair@sampledomain.com", "EMAIL"),
-                ("UTIB0000123", "IFSC")
-            ]
+                ("UTIB0000123", "IFSC"),
+            ],
         },
         {
             "name": "chat_support_02.png",
@@ -273,12 +265,9 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 ("Customer Sneha", "Hi, my courier package is delayed."),
                 ("Agent Rahul", "May I verify your delivery phone number?"),
                 ("Customer Sneha", "Yes, it is 9444012345 and email is sneha.b@webmail.in"),
-                ("Agent Rahul", "Thank you Sneha. Verification complete.")
+                ("Agent Rahul", "Thank you Sneha. Verification complete."),
             ],
-            "pii_items": [
-                ("9444012345", "PHONE_IN"),
-                ("sneha.b@webmail.in", "EMAIL")
-            ]
+            "pii_items": [("9444012345", "PHONE_IN"), ("sneha.b@webmail.in", "EMAIL")],
         },
         {
             "name": "chat_support_03.png",
@@ -287,12 +276,9 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 ("Compliance Officer", "Please confirm candidate PAN and Aadhaar for background check."),
                 ("HR Specialist", "Candidate PAN: CDEFG5678H"),
                 ("HR Specialist", f"Aadhaar UID: {generate_verhoeff('45678901234')}"),
-                ("Compliance Officer", "Verified against NSDL database.")
+                ("Compliance Officer", "Verified against NSDL database."),
             ],
-            "pii_items": [
-                ("CDEFG5678H", "PAN"),
-                (generate_verhoeff("45678901234"), "AADHAAR")
-            ]
+            "pii_items": [("CDEFG5678H", "PAN"), (generate_verhoeff("45678901234"), "AADHAAR")],
         },
         {
             "name": "chat_support_04.png",
@@ -301,22 +287,17 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 ("Helpdesk Bot", "Please provide billing credentials to reconcile card charge."),
                 ("User Deepak", f"Card charged was {generate_luhn('4222', 16)}"),
                 ("User Deepak", "My contact number is +91 9820012345"),
-                ("Helpdesk Bot", "Reconciliation initiated. Confirmation sent to deepak.k@cloudmail.org")
+                ("Helpdesk Bot", "Reconciliation initiated. Confirmation sent to deepak.k@cloudmail.org"),
             ],
             "pii_items": [
                 (generate_luhn("4222", 16), "CARD_NUMBER"),
                 ("+91 9820012345", "PHONE_IN"),
-                ("deepak.k@cloudmail.org", "EMAIL")
-            ]
-        }
+                ("deepak.k@cloudmail.org", "EMAIL"),
+            ],
+        },
     ]
     for sc in chat_scenarios:
-        test_cases.append({
-            "category": "CHAT_SUPPORT",
-            "file": sc["name"],
-            "title": sc["title"],
-            "scenario": sc
-        })
+        test_cases.append({"category": "CHAT_SUPPORT", "file": sc["name"], "title": sc["title"], "scenario": sc})
 
     # -------------------------------------------------------------
     # 5. CLEAN SCREENSHOTS (NO PII - to measure false positives)
@@ -332,8 +313,8 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "P99 Latency: 12.4 ms | P50 Latency: 3.1 ms",
                 "HTTP 200 OK: 99.98% | Error Rate: 0.02%",
                 "Storage Pool: 4.2 TB NVMe RAID-10 (Healthy)",
-                "Active Nodes: worker-01, worker-02, worker-03"
-            ]
+                "Active Nodes: worker-01, worker-02, worker-03",
+            ],
         },
         {
             "name": "clean_code_editor_02.png",
@@ -346,8 +327,8 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "    while len(pq) > 0:",
                 "        current_dist, current_v = heapq.heappop(pq)",
                 "        if current_dist > distances[current_v]: continue",
-                "    return distances"
-            ]
+                "    return distances",
+            ],
         },
         {
             "name": "clean_docs_page_03.png",
@@ -358,8 +339,8 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "Response: JSON array of vector similarity matches",
                 "Algorithm: Hierarchical Navigable Small World (HNSW)",
                 "Metric: Cosine distance normalized on unit sphere",
-                "Status: Experimental release channel v2.4.0-rc1"
-            ]
+                "Status: Experimental release channel v2.4.0-rc1",
+            ],
         },
         {
             "name": "clean_settings_04.png",
@@ -370,17 +351,12 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
                 "Refresh Rate: Adaptive Sync Enabled (G-Sync Compatible)",
                 "Color Profile: DCI-P3 98% Hardware Calibrated",
                 "Night Light Schedule: Sunset to Sunrise (3200K)",
-                "Firmware Version: 14.2.0-build-889"
-            ]
-        }
+                "Firmware Version: 14.2.0-build-889",
+            ],
+        },
     ]
     for sc in clean_scenarios:
-        test_cases.append({
-            "category": "CLEAN",
-            "file": sc["name"],
-            "title": sc["title"],
-            "scenario": sc
-        })
+        test_cases.append({"category": "CLEAN", "file": sc["name"], "title": sc["title"], "scenario": sc})
 
     return test_cases
 
@@ -389,17 +365,18 @@ def create_synthetic_datasets() -> List[Dict[str, Any]]:
 # RENDERING ENGINE
 # =====================================================================
 
-def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
+
+def render_screenshot(case: dict[str, Any]) -> dict[str, Any]:
     width, height = 1000, 680
     img = Image.new("RGB", (width, height), (248, 250, 252))
     draw = ImageDraw.Draw(img)
-    
+
     cat = case["category"]
     sc = case["scenario"]
     draw_window_frame(draw, width, height, case["title"])
-    
+
     ground_truth_items = []
-    
+
     if cat == "EMAIL_CLIENT":
         # Sidebar
         draw.rectangle([0, 38, 220, height], fill=(241, 245, 249), outline=(226, 232, 240))
@@ -407,25 +384,25 @@ def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
         folders = ["📥  Inbox (12)", "⭐  Starred", "📤  Sent Mail", "📝  Drafts (2)", "🗑️  Trash"]
         for idx, fld in enumerate(folders):
             draw.text((25, 95 + idx * 32), fld, font=FONT_BODY, fill=(51, 65, 85))
-            
+
         # Email view card
         draw_card(draw, 240, 55, 975, 650)
         draw.text((265, 75), sc["subject"], font=FONT_TITLE, fill=(15, 23, 42))
-        
+
         # From line
         draw.text((265, 115), "From:", font=FONT_BOLD, fill=(100, 116, 139))
         draw.text((320, 115), sc["sender"], font=FONT_BODY, fill=(15, 23, 42))
-        
+
         # Date & status
         draw.text((820, 115), "Today, 10:24 AM", font=FONT_SMALL, fill=(148, 163, 184))
         draw.line([265, 145, 950, 145], fill=(226, 232, 240), width=1)
-        
+
         # Body lines
         curr_y = 170
         for line in sc["lines"]:
             draw.text((265, curr_y), line, font=FONT_BODY, fill=(30, 41, 59))
             curr_y += 34
-            
+
         # Record PII annotations
         ground_truth_items.append({"pii_type": "EMAIL", "text": sc["sender"]})
         ground_truth_items.append({"pii_type": "PHONE_IN", "text": sc["phone"]})
@@ -434,29 +411,40 @@ def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
     elif cat == "KYC_FORM":
         draw_card(draw, 60, 60, 940, 640)
         draw.text((95, 85), case["title"], font=FONT_TITLE, fill=(15, 23, 42))
-        draw.text((95, 115), "Statutory Indian Identity Compliance — Form 60 / Aadhaar-PAN Linking", font=FONT_SMALL, fill=(100, 116, 139))
+        draw.text(
+            (95, 115),
+            "Statutory Indian Identity Compliance — Form 60 / Aadhaar-PAN Linking",
+            font=FONT_SMALL,
+            fill=(100, 116, 139),
+        )
         draw.line([95, 140, 905, 140], fill=(226, 232, 240), width=1)
-        
+
         # Form Fields
         fields = [
             ("Full Legal Name", sc["name_val"], False),
             ("Date of Birth", sc["dob"], False),
             ("Income Tax Permanent Account Number (PAN)", sc["pan"], "PAN"),
-            ("Unique Identification Aadhaar Number (UIDAI)", f"{sc['aadhaar'][:4]} {sc['aadhaar'][4:8]} {sc['aadhaar'][8:]}", "AADHAAR"),
-            ("Registered Mobile Number (OTP Verified)", sc["phone"], "PHONE_IN")
+            (
+                "Unique Identification Aadhaar Number (UIDAI)",
+                f"{sc['aadhaar'][:4]} {sc['aadhaar'][4:8]} {sc['aadhaar'][8:]}",
+                "AADHAAR",
+            ),
+            ("Registered Mobile Number (OTP Verified)", sc["phone"], "PHONE_IN"),
         ]
-        
+
         curr_y = 165
         for label, val, pii_t in fields:
             draw.text((95, curr_y), label, font=FONT_BOLD, fill=(51, 65, 85))
             # Input Box
-            draw.rounded_rectangle([95, curr_y + 24, 850, curr_y + 64], radius=6, fill=(248, 250, 252), outline=(203, 213, 225), width=1)
+            draw.rounded_rectangle(
+                [95, curr_y + 24, 850, curr_y + 64], radius=6, fill=(248, 250, 252), outline=(203, 213, 225), width=1
+            )
             draw.text((115, curr_y + 36), val, font=FONT_BODY, fill=(15, 23, 42))
-            
+
             if pii_t:
                 ground_truth_items.append({"pii_type": pii_t, "text": val})
             curr_y += 85
-            
+
         # Submit Button
         draw.rounded_rectangle([95, 600, 280, 630], radius=6, fill=(37, 99, 235))
         draw.text((125, 606), "Submit & Verify KYC", font=FONT_BOLD, fill=(255, 255, 255))
@@ -466,23 +454,23 @@ def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
         draw_card(draw, 50, 60, 950, 135, fill=(30, 58, 138), outline=(30, 58, 138))
         draw.text((80, 75), sc["title"], font=FONT_TITLE, fill=(255, 255, 255))
         draw.text((80, 105), sc["bank_name"], font=FONT_SMALL, fill=(191, 219, 254))
-        
+
         # Cards grid
         # Card 1: Bank Account Details
         draw_card(draw, 50, 155, 480, 390)
         draw.text((75, 175), "PRIMARY SETTLEMENT ACCOUNT", font=FONT_HEADING, fill=(30, 41, 59))
         draw.text((75, 215), "Branch IFSC Code:", font=FONT_BOLD, fill=(100, 116, 139))
         draw.text((240, 215), sc["ifsc"], font=FONT_BODY, fill=(15, 23, 42))
-        
+
         draw.text((75, 255), "Account Number:", font=FONT_BOLD, fill=(100, 116, 139))
         draw.text((240, 255), "50100294821038", font=FONT_BODY, fill=(15, 23, 42))
-        
+
         draw.text((75, 295), "Linked Virtual VPA:", font=FONT_BOLD, fill=(100, 116, 139))
         draw.text((240, 295), sc["upi"], font=FONT_BODY, fill=(15, 23, 42))
-        
+
         draw.text((75, 335), "Audit Notification Email:", font=FONT_BOLD, fill=(100, 116, 139))
         draw.text((255, 335), sc["email"], font=FONT_BODY, fill=(15, 23, 42))
-        
+
         # Card 2: Commercial Credit Card
         draw_card(draw, 510, 155, 950, 390)
         draw.text((535, 175), "CORPORATE PURCHASING CARD", font=FONT_HEADING, fill=(30, 41, 59))
@@ -492,14 +480,29 @@ def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
         draw.text((560, 275), card_formatted, font=FONT_TITLE, fill=(248, 250, 252))
         draw.text((560, 325), "VALID THRU: 08/29", font=FONT_SMALL, fill=(203, 213, 225))
         draw.text((750, 325), "VIJAYRAJ S", font=FONT_BOLD, fill=(255, 255, 255))
-        
+
         # Bottom transaction ledger
         draw_card(draw, 50, 410, 950, 640)
         draw.text((75, 430), "RECENT REAL-TIME SETTLEMENTS", font=FONT_HEADING, fill=(30, 41, 59))
-        draw.text((75, 470), "Txn ID #982103  |  RTGS Inward Clearing  |  IFSC: " + sc["ifsc"] + "  |  Status: SUCCESSFUL", font=FONT_BODY, fill=(51, 65, 85))
-        draw.text((75, 510), "UPI Collect Req |  From: " + sc["upi"] + "  |  Amount: INR 45,000.00  |  Approved", font=FONT_BODY, fill=(51, 65, 85))
-        draw.text((75, 550), "Statement Dispatch  |  Recipient: " + sc["email"] + "  |  Sent", font=FONT_BODY, fill=(51, 65, 85))
-        
+        draw.text(
+            (75, 470),
+            "Txn ID #982103  |  RTGS Inward Clearing  |  IFSC: " + sc["ifsc"] + "  |  Status: SUCCESSFUL",
+            font=FONT_BODY,
+            fill=(51, 65, 85),
+        )
+        draw.text(
+            (75, 510),
+            "UPI Collect Req |  From: " + sc["upi"] + "  |  Amount: INR 45,000.00  |  Approved",
+            font=FONT_BODY,
+            fill=(51, 65, 85),
+        )
+        draw.text(
+            (75, 550),
+            "Statement Dispatch  |  Recipient: " + sc["email"] + "  |  Sent",
+            font=FONT_BODY,
+            fill=(51, 65, 85),
+        )
+
         ground_truth_items.append({"pii_type": "IFSC", "text": sc["ifsc"]})
         ground_truth_items.append({"pii_type": "UPI_ID", "text": sc["upi"]})
         ground_truth_items.append({"pii_type": "EMAIL", "text": sc["email"]})
@@ -509,13 +512,13 @@ def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
         draw_card(draw, 100, 60, 900, 640)
         draw.text((130, 80), case["title"], font=FONT_HEADING, fill=(15, 23, 42))
         draw.line([100, 110, 900, 110], fill=(226, 232, 240), width=1)
-        
+
         curr_y = 135
         for sender, msg in sc["messages"]:
             draw.text((130, curr_y), sender, font=FONT_BOLD, fill=(37, 99, 235))
             draw.text((130, curr_y + 22), msg, font=FONT_BODY, fill=(30, 41, 59))
             curr_y += 65
-            
+
         for text_val, pii_t in sc["pii_items"]:
             ground_truth_items.append({"pii_type": pii_t, "text": text_val})
 
@@ -523,23 +526,23 @@ def render_screenshot(case: Dict[str, Any]) -> Dict[str, Any]:
         draw_card(draw, 80, 70, 920, 630)
         draw.text((115, 95), case["title"], font=FONT_TITLE, fill=(15, 23, 42))
         draw.line([115, 130, 885, 130], fill=(226, 232, 240), width=1)
-        
+
         curr_y = 160
         for item in sc["metrics"]:
             draw.text((115, curr_y), item, font=FONT_BODY, fill=(51, 65, 85))
             curr_y += 48
-            
+
         # Clean case has NO ground truth PII items!
 
     out_path = os.path.join(OUTPUT_DIR, case["file"])
     img.save(out_path, "PNG")
-    
+
     return {
         "file": case["file"],
         "category": cat,
         "is_clean": (cat == "CLEAN"),
         "ground_truth_count": len(ground_truth_items),
-        "ground_truth_items": ground_truth_items
+        "ground_truth_items": ground_truth_items,
     }
 
 
@@ -547,7 +550,7 @@ def main():
     print(f"Generating 20 synthetic test screenshots into '{OUTPUT_DIR}'...")
     test_cases = create_synthetic_datasets()
     summary = []
-    
+
     total_pii_items = 0
     for case in test_cases:
         res = render_screenshot(case)
@@ -555,11 +558,11 @@ def main():
         total_pii_items += res["ground_truth_count"]
         status = "CLEAN (0 PII)" if res["is_clean"] else f"PII: {res['ground_truth_count']} entities"
         print(f"  [OK] {res['file']:<25} ({res['category']:<17}) -> {status}")
-        
+
     gt_file = os.path.join(OUTPUT_DIR, "ground_truth.json")
     with open(gt_file, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
-        
+
     print("=" * 60)
     print(f"Successfully generated {len(summary)} synthetic screenshots.")
     print(f"Total synthetic PII ground truth instances: {total_pii_items}")

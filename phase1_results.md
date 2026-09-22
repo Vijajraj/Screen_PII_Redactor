@@ -1,9 +1,6 @@
 # Phase 1 Results — Model Build, Export & Validation
 
-**Project:** Screen PII Redactor (On-Device Indian-Format PII, Snapdragon AI Lab Challenge)  
-**Execution Platform:** Local Validation Environment (Windows x86_64, CPUExecutionProvider)  
-**Target Submission Platform:** Snapdragon Laptops (Hexagon NPU / QNNExecutionProvider)  
-**Validation Date:** September 2026  
+**Project:** Screen PII Redactor (On-Device Indian-Format PII, Snapdragon AI Lab Challenge)**Execution Platform:** Local Validation Environment (Windows x86_64, CPUExecutionProvider)**Target Submission Platform:** Snapdragon Laptops (Hexagon NPU / QNNExecutionProvider)**Validation Date:** September 2026
 
 ---
 
@@ -27,7 +24,7 @@ Phase 1 successfully establishes the on-device PII detection and redaction found
 | **Quantization Scheme** | FP32 | Dynamic INT8 (QUInt8) | Zero manual calibration required |
 | **Mean Absolute Error (MAE)** | Baseline (0.000000) | **0.003383** | < 0.35% drift across probability maps |
 | **Max Absolute Error** | Baseline (0.000000) | **1.0** | Localized to sharp boundary contours |
-| **Local CPU Latency (Avg)** | **75.07 ms** | **145.95 ms** | Evaluated on x86_64 host CPU |
+| **Local CPU Latency (Avg)** | **81.89 ms** | **140.3 ms** | Evaluated on x86_64 host CPU |
 
 ---
 
@@ -67,10 +64,10 @@ Evaluated across 20 synthetic desktop application screenshots comprising **51 gr
 
 ```python
 TARGET_PROVIDER_PRIORITY = [
-    "QNNExecutionProvider",     # Snapdragon Hexagon NPU (Submission Target)
-    "NNAPIExecutionProvider",   # Android NPU / DSP
+    "QNNExecutionProvider",  # Snapdragon Hexagon NPU (Submission Target)
+    "NNAPIExecutionProvider",  # Android NPU / DSP
     "CoreMLExecutionProvider",  # Apple Neural Engine
-    "CPUExecutionProvider"      # Universal Fallback
+    "CPUExecutionProvider",  # Universal Fallback
 ]
 ```
 

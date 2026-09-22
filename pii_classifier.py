@@ -16,8 +16,7 @@ Constraints:
 """
 
 import re
-from typing import Dict, List, Optional, Tuple, Any
-
+from typing import Any
 
 # =====================================================================
 # 1. VERHOEFF CHECKSUM ALGORITHM (Aadhaar Verification)
@@ -33,7 +32,7 @@ _VERHOEFF_D = [
     [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
     [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
     [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
-    [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
 ]
 
 _VERHOEFF_P = [
@@ -44,7 +43,7 @@ _VERHOEFF_P = [
     [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
     [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
     [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
-    [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
+    [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
 ]
 
 _VERHOEFF_INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
@@ -52,7 +51,7 @@ _VERHOEFF_INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
 
 def validate_verhoeff(num_str: str) -> bool:
     """Validate numeric string using Verhoeff algorithm (returns True if valid)."""
-    clean_digits = re.sub(r'\D', '', str(num_str))
+    clean_digits = re.sub(r"\D", "", str(num_str))
     if not clean_digits:
         return False
     c = 0
@@ -63,7 +62,7 @@ def validate_verhoeff(num_str: str) -> bool:
 
 def generate_verhoeff(base_digits: str) -> str:
     """Generate valid Verhoeff-appended number from numeric string."""
-    clean_digits = re.sub(r'\D', '', str(base_digits))
+    clean_digits = re.sub(r"\D", "", str(base_digits))
     c = 0
     for i, item in enumerate(reversed(clean_digits)):
         c = _VERHOEFF_D[c][_VERHOEFF_P[(i + 1) % 8][int(item)]]
@@ -74,6 +73,7 @@ def generate_verhoeff(base_digits: str) -> str:
 # =====================================================================
 # 2. LUHN CHECKSUM ALGORITHM (Card Verification)
 # =====================================================================
+
 
 def validate_luhn(card_str: str) -> bool:
     """Validate payment card number using Luhn checksum algorithm."""
@@ -94,7 +94,8 @@ def validate_luhn(card_str: str) -> bool:
 def generate_luhn(prefix: str, length: int = 16) -> str:
     """Generate a synthetically valid card number with specified prefix and length."""
     import random
-    clean_prefix = re.sub(r'\D', '', str(prefix))
+
+    clean_prefix = re.sub(r"\D", "", str(prefix))
     digits = [int(c) for c in clean_prefix]
     while len(digits) < length - 1:
         digits.append(random.randint(0, 9))
@@ -106,7 +107,7 @@ def generate_luhn(prefix: str, length: int = 16) -> str:
         checksum += val
     check_digit = (10 - (checksum % 10)) % 10
     digits.append(check_digit)
-    return ''.join(map(str, digits))
+    return "".join(map(str, digits))
 
 
 # =====================================================================
@@ -115,18 +116,48 @@ def generate_luhn(prefix: str, length: int = 16) -> str:
 
 KNOWN_UPI_HANDLES = {
     # Google Pay
-    "okaxis", "okhdfcbank", "okicici", "oksbi",
+    "okaxis",
+    "okhdfcbank",
+    "okicici",
+    "oksbi",
     # PhonePe
-    "ybl", "ibl", "axl",
+    "ybl",
+    "ibl",
+    "axl",
     # Paytm
-    "paytm", "ptyes", "pthdfc", "ptaxis", "ptsbi",
+    "paytm",
+    "ptyes",
+    "pthdfc",
+    "ptaxis",
+    "ptsbi",
     # Amazon Pay
-    "apl", "rapl",
+    "apl",
+    "rapl",
     # BHIM & Banks
-    "upi", "sbi", "hdfcbank", "icici", "axisbank", "kotak", "indus",
-    "barodampay", "pnb", "cnrb", "boi", "iob", "cub", "federal",
-    "rbl", "idfcbank", "postbank", "airtel", "freecharge", "mobikwik",
-    "jupiteraxis", "sliceaxis", "naviaxis", "fbl"
+    "upi",
+    "sbi",
+    "hdfcbank",
+    "icici",
+    "axisbank",
+    "kotak",
+    "indus",
+    "barodampay",
+    "pnb",
+    "cnrb",
+    "boi",
+    "iob",
+    "cub",
+    "federal",
+    "rbl",
+    "idfcbank",
+    "postbank",
+    "airtel",
+    "freecharge",
+    "mobikwik",
+    "jupiteraxis",
+    "sliceaxis",
+    "naviaxis",
+    "fbl",
 }
 
 
@@ -135,32 +166,35 @@ KNOWN_UPI_HANDLES = {
 # =====================================================================
 
 # Aadhaar: 12 digits, optional space/hyphen/period/comma after each 4 digits; first digit 2-9
-RE_AADHAAR = re.compile(r'\b[2-9]\d{3}[\s\-,\.]?[0-9]{4}[\s\-,\.]?[0-9]{4}\b')
+RE_AADHAAR = re.compile(
+    r"(?<![0-9])(?<![0-9][\s\-,\.])\b[2-9]\d{3}[\s\-,\.]?[0-9]{4}[\s\-,\.]?[0-9]{4}\b(?!(?:[\s\-,\.]?[0-9]))"
+)
 
 # PAN: 5 uppercase letters, 4 digits, 1 uppercase letter
-RE_PAN = re.compile(r'\b[A-Z]{5}[0-9]{4}[A-Z]\b')
+RE_PAN = re.compile(r"\b[A-Z]{5}[0-9]{4}[A-Z]\b")
 
 # UPI ID: username@bank_handle
-RE_UPI_CANDIDATE = re.compile(r'\b([A-Za-z0-9._\-]+)@([A-Za-z0-9]+)\b')
+RE_UPI_CANDIDATE = re.compile(r"\b([A-Za-z0-9._\-]+)@([A-Za-z0-9]+)\b")
 
 # Indian Phone: optional +91 prefix, starts with 6, 7, 8, or 9, followed by 9 digits
-RE_PHONE_IN = re.compile(r'(?:\+91[\-\s,\.]?)?[6-9]\d{9}\b')
+RE_PHONE_IN = re.compile(r"(?:\+91[\-\s,\.]?)?[6-9]\d{9}\b")
 
 # IFSC: 4 uppercase letters, 0, 6 alphanumeric characters
-RE_IFSC = re.compile(r'\b[A-Z]{4}0[A-Z0-9]{6}\b')
+RE_IFSC = re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b")
 
 # Standard Email
-RE_EMAIL = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
+RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 
 # Payment Card candidate (13-19 digits, optional group separators)
-RE_CARD_CANDIDATE = re.compile(r'\b(?:\d{4}[\s\-,\.]?){3}\d{4}\b|\b\d{13,19}\b')
+RE_CARD_CANDIDATE = re.compile(r"\b(?:\d{4}[\s\-,\.]?){3}\d{4}\b|\b\d{13,19}\b")
 
 
 # =====================================================================
 # 5. CORE CLASSIFIER FUNCTION
 # =====================================================================
 
-def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+
+def classify_text(text: str, bbox: list[int] | None = None) -> list[dict[str, Any]]:
     """
     Classifies PII entities inside `text` according to Section 3.3 priority order.
 
@@ -179,29 +213,28 @@ def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str,
     if not text or not isinstance(text, str):
         return []
 
-    matches: List[Dict[str, Any]] = []
-    matched_spans: List[Tuple[int, int]] = []
+    matches: list[dict[str, Any]] = []
+    matched_spans: list[tuple[int, int]] = []
 
     def span_overlaps(start: int, end: int) -> bool:
-        for s, e in matched_spans:
-            if not (end <= s or start >= e):
-                return True
-        return False
+        return any(not (end <= s or start >= e) for s, e in matched_spans)
 
     # 1. Aadhaar (Verhoeff checksum validated)
     for m in RE_AADHAAR.finditer(text):
         candidate = m.group(0)
-        digits_only = re.sub(r'\D', '', candidate)
+        digits_only = re.sub(r"\D", "", candidate)
         if len(digits_only) == 12 and validate_verhoeff(digits_only):
             start, end = m.span()
             if not span_overlaps(start, end):
-                matches.append({
-                    "bbox": bbox,
-                    "pii_type": "AADHAAR",
-                    "matched_text": candidate,
-                    "confidence": 1.0,
-                    "span": [start, end]
-                })
+                matches.append(
+                    {
+                        "bbox": bbox,
+                        "pii_type": "AADHAAR",
+                        "matched_text": candidate,
+                        "confidence": 1.0,
+                        "span": [start, end],
+                    }
+                )
                 matched_spans.append((start, end))
 
     # 2. PAN
@@ -209,13 +242,9 @@ def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str,
         start, end = m.span()
         if not span_overlaps(start, end):
             candidate = m.group(0)
-            matches.append({
-                "bbox": bbox,
-                "pii_type": "PAN",
-                "matched_text": candidate,
-                "confidence": 0.8,
-                "span": [start, end]
-            })
+            matches.append(
+                {"bbox": bbox, "pii_type": "PAN", "matched_text": candidate, "confidence": 0.8, "span": [start, end]}
+            )
             matched_spans.append((start, end))
 
     # 3. UPI ID (Restricted to known bank handles)
@@ -225,13 +254,15 @@ def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str,
             start, end = m.span()
             if not span_overlaps(start, end):
                 candidate = m.group(0)
-                matches.append({
-                    "bbox": bbox,
-                    "pii_type": "UPI_ID",
-                    "matched_text": candidate,
-                    "confidence": 0.8,
-                    "span": [start, end]
-                })
+                matches.append(
+                    {
+                        "bbox": bbox,
+                        "pii_type": "UPI_ID",
+                        "matched_text": candidate,
+                        "confidence": 0.8,
+                        "span": [start, end],
+                    }
+                )
                 matched_spans.append((start, end))
 
     # 4. Indian Phone
@@ -239,13 +270,15 @@ def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str,
         start, end = m.span()
         if not span_overlaps(start, end):
             candidate = m.group(0)
-            matches.append({
-                "bbox": bbox,
-                "pii_type": "PHONE_IN",
-                "matched_text": candidate,
-                "confidence": 0.8,
-                "span": [start, end]
-            })
+            matches.append(
+                {
+                    "bbox": bbox,
+                    "pii_type": "PHONE_IN",
+                    "matched_text": candidate,
+                    "confidence": 0.8,
+                    "span": [start, end],
+                }
+            )
             matched_spans.append((start, end))
 
     # 5. IFSC Code
@@ -253,13 +286,9 @@ def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str,
         start, end = m.span()
         if not span_overlaps(start, end):
             candidate = m.group(0)
-            matches.append({
-                "bbox": bbox,
-                "pii_type": "IFSC",
-                "matched_text": candidate,
-                "confidence": 0.8,
-                "span": [start, end]
-            })
+            matches.append(
+                {"bbox": bbox, "pii_type": "IFSC", "matched_text": candidate, "confidence": 0.8, "span": [start, end]}
+            )
             matched_spans.append((start, end))
 
     # 6. Email (Generic, not India-specific)
@@ -267,29 +296,27 @@ def classify_text(text: str, bbox: Optional[List[int]] = None) -> List[Dict[str,
         start, end = m.span()
         if not span_overlaps(start, end):
             candidate = m.group(0)
-            matches.append({
-                "bbox": bbox,
-                "pii_type": "EMAIL",
-                "matched_text": candidate,
-                "confidence": 0.8,
-                "span": [start, end]
-            })
+            matches.append(
+                {"bbox": bbox, "pii_type": "EMAIL", "matched_text": candidate, "confidence": 0.8, "span": [start, end]}
+            )
             matched_spans.append((start, end))
 
     # 7. Card Number (Luhn checksum validated)
     for m in RE_CARD_CANDIDATE.finditer(text):
         candidate = m.group(0)
-        digits_only = re.sub(r'\D', '', candidate)
+        digits_only = re.sub(r"\D", "", candidate)
         if 13 <= len(digits_only) <= 19 and validate_luhn(digits_only):
             start, end = m.span()
             if not span_overlaps(start, end):
-                matches.append({
-                    "bbox": bbox,
-                    "pii_type": "CARD_NUMBER",
-                    "matched_text": candidate,
-                    "confidence": 1.0,
-                    "span": [start, end]
-                })
+                matches.append(
+                    {
+                        "bbox": bbox,
+                        "pii_type": "CARD_NUMBER",
+                        "matched_text": candidate,
+                        "confidence": 1.0,
+                        "span": [start, end],
+                    }
+                )
                 matched_spans.append((start, end))
 
     return matches
@@ -303,7 +330,7 @@ if __name__ == "__main__":
         "UPI test: user@okhdfcbank and generic email user@gmail.com",
         "Phone: +91 9876543210 and 8765432109",
         "IFSC: SBIN0001234 and HDFC0004567",
-        "Card: 4532 1957 3372 8189"
+        "Card: 4532 1957 3372 8189",
     ]
     print("Running PII Classifier self-test...")
     for s in test_strings:
