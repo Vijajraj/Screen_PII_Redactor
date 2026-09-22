@@ -1,4 +1,4 @@
-# Screen PII Redactor 🛡️
+# Screen PII Redactor
 
 **On-Device Sensitive PII Detection & Redaction for Indian & Universal Identifiers**  
 *Snapdragon AI Lab Challenge — Phase 1: Model Build & Export (Local)*
@@ -13,87 +13,245 @@
 
 ## 1. Overview
 
-**Screen PII Redactor** is a high-performance, on-device privacy engine built to detect and redact sensitive Personally Identifiable Information (PII) from screen captures and desktop frames. Designed specifically for **Qualcomm Snapdragon X-Elite / Hexagon NPU** hardware via the **QNN Execution Provider**, the architecture enforces static tensor shapes, INT8 quantization, and deterministic checksum-backed classification.
+**Screen PII Redactor** is a high-performance, on-device privacy engine engineered to detect and redact sensitive Personally Identifiable Information (PII) from screen captures and desktop application frames in real time. Designed specifically for **Qualcomm Snapdragon X-Elite / Hexagon NPU** hardware via the **QNN Execution Provider**, the architecture enforces static tensor dimensions, INT8 dynamic quantization, and deterministic checksum-backed classification.
 
-### Pipeline Architecture
+---
 
-```
-Input Image / Screenshot Frame
-    │
-    ▼
-[1] Text Detection (PP-OCRv4 Mobile DBNet — INT8 Static ONNX [1, 3, 640, 640])
-    │ ──► Extracts text regions & bounding boxes [x1, y1, x2, y2]
-    ▼
-[2] Text Recognition (SVTR-based Mobile Recognizer with CTC Greedy Decoding)
-    │ ──► Extracts raw text strings per region
-    ▼
-[3] PII Classification Layer (Deterministic Regex + Mathematical Checksums)
-    │ ──► Validates Aadhaar (Verhoeff), Cards (Luhn), PAN, UPI, Phone, IFSC, Email
-    ▼
-Output: List of {bbox: [x1, y1, x2, y2], pii_type: str, matched_text: str, confidence: float}
+## 2. End-to-End System Architecture
+
+```mermaid
+flowchart TD
+    subgraph S1["Stage 1: Input & Frame Preprocessing"]
+        A["Input Screenshot Frame<br/>(RGB / BGR Array)"] --> B["Bilinear Resizing & Letterboxing<br/>Static Dimensions: 640 x 640"]
+        B --> C["Standard Normalization<br/>(img / 255.0 - Mean) / Std<br/>Tensor Shape: [1, 3, 640, 640]"]
+    end
+
+    subgraph S2["Stage 2: On-Device Neural Detection"]
+        C --> D["PP-OCRv4 Mobile DBNet Text Detector<br/>(detector_quantized.onnx)"]
+        D -.->|"Primary Target"| EP1["QNNExecutionProvider<br/>Qualcomm Hexagon NPU"]
+        D -.->|"Fallback"| EP2["CPUExecutionProvider<br/>Host x86_64 / ARM CPU"]
+        D --> E["Probability Heatmap Output<br/>Tensor Shape: [1, 1, 640, 640]"]
+        E --> F["DBNet Postprocessing<br/>Binary Masking (Threshold: 0.3)<br/>Contour Extraction & Polygon Unclipping"]
+        F --> G["Rescaled Bounding Boxes<br/>[x1, y1, x2, y2]"]
+    end
+
+    subgraph S3["Stage 3: Text Recognition"]
+        G --> H["Dynamic Text Region Cropping<br/>Normalized Height: 48px"]
+        H --> I["PP-OCRv4 Mobile SVTR Recognizer"]
+        I --> J["CTC Greedy Decoding<br/>(Character Dictionary Map)"]
+        J --> K["Extracted Raw Text Strings"]
+    end
+
+    subgraph S4["Stage 4: Deterministic PII Classification"]
+        K --> L["Portable PII Classifier<br/>(pii_classifier.py)"]
+        L --> M1["Aadhaar Matcher<br/>Regex + Verhoeff Checksum<br/>Confidence: 1.0"]
+        L --> M2["PAN Matcher<br/>Regex Format<br/>Confidence: 0.8"]
+        L --> M3["UPI ID Matcher<br/>Regex + Bank Handle Whitelist<br/>Confidence: 0.8"]
+        L --> M4["Indian Phone Matcher<br/>Regex Format (+91 / 10-digit)<br/>Confidence: 0.8"]
+        L --> M5["IFSC Code Matcher<br/>Regex Format<br/>Confidence: 0.8"]
+        L --> M6["Email Matcher<br/>RFC 5322 Standard<br/>Confidence: 0.8"]
+        L --> M7["Card Number Matcher<br/>Regex + Luhn Checksum<br/>Confidence: 1.0"]
+    end
+
+    subgraph S5["Stage 5: Structured Output"]
+        M1 & M2 & M3 & M4 & M5 & M6 & M7 --> N["Sanitized Detection Payload<br/>List of {bbox, pii_type, matched_text, confidence}"]
+    end
 ```
 
 ---
 
-## 2. Phase 1 Deliverables (Handoff to Phase 2)
+## 3. Execution Provider Fallback Sequence
 
-| # | Deliverable File | Description | Status |
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Application Client / Capture Loop
+    participant Wrapper as inference_wrapper.py
+    participant ORT as ONNX Runtime Environment
+    participant Hexagon as Qualcomm Hexagon NPU (QNN)
+    participant HostCPU as Host CPU Fallback
+
+    Client->>Wrapper: Initialize Pipeline(detector_quantized.onnx)
+    Wrapper->>ORT: Query get_available_providers()
+    ORT-->>Wrapper: Return Available Providers List
+
+    alt QNNExecutionProvider is Present (Snapdragon Hardware)
+        Wrapper->>Hexagon: Bind Session to QNNExecutionProvider
+        Hexagon-->>Wrapper: Hardware Accelerator Ready
+    else QNN Not Found (Development / CI Testbed)
+        Wrapper->>HostCPU: Fallback to CPUExecutionProvider
+        HostCPU-->>Wrapper: CPU Fallback Initialized
+    end
+
+    Client->>Wrapper: run_on_image(screenshot.png)
+    alt On Snapdragon Device
+        Wrapper->>Hexagon: Execute Static Inference [1, 3, 640, 640]
+        Hexagon-->>Wrapper: Return Heatmap Tensor [1, 1, 640, 640]
+    else On Local Host
+        Wrapper->>HostCPU: Execute Static Inference [1, 3, 640, 640]
+        HostCPU-->>Wrapper: Return Heatmap Tensor [1, 1, 640, 640]
+    end
+    Wrapper->>Client: Return Detected Regions & PII Annotations
+```
+
+---
+
+## 4. Phase 1 Deliverables (Handoff to Phase 2)
+
+| Number | Deliverable File | Technical Scope | Status |
 |:---:|---|---|:---:|
-| 1 | [`detector_quantized.onnx`](detector_quantized.onnx) | Final INT8 quantized DBNet text detector (Fixed static shape: `[1, 3, 640, 640]`, 1.27 MB) | ✅ Complete |
-| 2 | [`pii_classifier.py`](pii_classifier.py) | Standalone, portable PII classifier (pure Python standard library + `re` only, zero external dependencies) | ✅ Complete |
-| 3 | [`inference_wrapper.py`](inference_wrapper.py) | Hardware-agnostic EP-abstraction inference engine with QNN/NNAPI/CoreML/CPU priority fallback | ✅ Complete |
-| 4 | [`synthetic_test_set/`](synthetic_test_set/) | 20 synthetic mock screenshots across 5 categories + `ground_truth.json` catalog | ✅ Complete |
-| 5 | [`phase1_results.md`](phase1_results.md) | Measured validation report with real benchmarks (model compression, MAE drift, precision/recall) | ✅ Complete |
-| 6 | [`phase1_notebook.ipynb`](phase1_notebook.ipynb) | Complete 10-section Jupyter notebook demonstrating the entire pipeline | ✅ Complete |
+| **1** | [`detector_quantized.onnx`](detector_quantized.onnx) | Final INT8 quantized DBNet text detector with fixed static shape `[1, 3, 640, 640]` (1.27 MB, 3.57x compression) | Completed |
+| **2** | [`pii_classifier.py`](pii_classifier.py) | Standalone, portable PII classifier using Python standard library + `re` only (zero external dependencies) | Completed |
+| **3** | [`inference_wrapper.py`](inference_wrapper.py) | Hardware-agnostic EP-abstraction inference engine with QNN/NNAPI/CoreML/CPU priority fallback | Completed |
+| **4** | [`synthetic_test_set/`](synthetic_test_set/) | 20 synthetic mock screenshots across 5 UI categories + `ground_truth.json` catalog | Completed |
+| **5** | [`phase1_results.md`](phase1_results.md) | Measured validation report with real benchmarks (model compression, MAE drift, precision/recall) | Completed |
+| **6** | [`phase1_notebook.ipynb`](phase1_notebook.ipynb) | Complete 10-section Jupyter notebook implementing Sections 1-10 of the specification | Completed |
 
 ---
 
-## 3. Execution Provider Abstraction (Cross-Device Portability)
+## 5. Execution Provider Portability Matrix
 
-The pipeline is hardware-agnostic; only the **ONNX Runtime execution provider** changes per target device:
+The model file and preprocessing pipeline remain invariant across target platforms; only the active execution provider changes:
 
-| Platform | Execution Provider | Target Hardware | Fallback Priority |
+| Platform | Execution Provider | Target Hardware | Execution Priority |
 |---|---|---|:---:|
 | **Snapdragon Laptops (Windows)** | `QNNExecutionProvider` | **Qualcomm Hexagon NPU (Challenge Target)** | **Priority 1** |
-| **Android Devices** | `NNAPIExecutionProvider` | Phone NPU / DSP | **Priority 2** |
+| **Android Devices** | `NNAPIExecutionProvider` | Mobile NPU / DSP | **Priority 2** |
 | **Apple Silicon (macOS / iOS)** | `CoreMLExecutionProvider` | Apple Neural Engine (ANE) | **Priority 3** |
 | **Universal Local Fallback** | `CPUExecutionProvider` | Host x86_64 / ARM CPU | **Priority 4** |
 
-When running on standard local development machines without Snapdragon NPU hardware, the wrapper automatically selects `CPUExecutionProvider` with zero errors.
-
 ---
 
-## 4. Benchmark & Validation Results
+## 6. Model Quantization & Compression Analysis
 
-*All values measured locally on the 20-image synthetic benchmark set (see [`phase1_results.md`](phase1_results.md)).*
+```
+========================================================================================
+MODEL SIZE REDUCTION BREAKDOWN
+========================================================================================
+FP32 Static ONNX       [========================================] 4.54 MB (Baseline)
+INT8 Quantized ONNX    [===========                             ] 1.27 MB (3.57x Compression)
+                                                                  72.0% Storage Reduction
+========================================================================================
+QUANTIZATION ACCURACY DRIFT
+========================================================================================
+Mean Absolute Error (MAE): 0.003383 (< 0.35% drift across all 20 benchmark test images)
+Max Contouring Difference: Localized strictly to sub-pixel edge transitions
+========================================================================================
+```
 
-### Model Quantization Benchmark
-
-| Metric | FP32 Static ONNX | INT8 Quantized ONNX (`detector_quantized.onnx`) |
+| Metric | Pre-Export / FP32 Static ONNX | INT8 Quantized ONNX (`detector_quantized.onnx`) |
 |---|:---:|:---:|
-| **Input Shape** | `[1, 3, 640, 640]` | `[1, 3, 640, 640]` (Fixed static) |
-| **File Size** | 4.54 MB | **1.27 MB** |
-| **Compression Ratio** | Baseline | **3.57x (72.0% size reduction)** |
-| **Mean Absolute Error (MAE)** | 0.000000 | **0.003383 (< 0.35% drift)** |
-
-### PII Classification Performance
-
-| PII Category | Validation Method | Ground Truth | True Positives | Precision | Recall | F1 Score |
-|---|---|:---:|:---:|:---:|:---:|:---:|
-| **AADHAAR** | Regex `\d{4}\s?\d{4}\s?\d{4}` + **Verhoeff checksum** | 5 | 5 | **100.0%** | **100.0%** | **1.000** |
-| **PAN** | Regex `[A-Z]{5}\d{4}[A-Z]{1}` | 5 | 5 | **100.0%** | **100.0%** | **1.000** |
-| **UPI_ID** | Known bank handle whitelist (`@okhdfcbank`, `@oksbi`, etc.) | 8 | 8 | **100.0%** | **100.0%** | **1.000** |
-| **PHONE_IN** | Regex `(\+91[\-\s]?)?[6-9]\d{9}` | 12 | 12 | **100.0%** | **100.0%** | **1.000** |
-| **IFSC** | Regex `[A-Z]{4}0[A-Z0-9]{6}` | 5 | 5 | **100.0%** | **100.0%** | **1.000** |
-| **EMAIL** | RFC 5322 Standard Pattern | 11 | 11 | **100.0%** | **100.0%** | **1.000** |
-| **CARD_NUMBER** | Regex + **Luhn checksum** | 5 | 3 | **100.0%** | **60.0%** | **0.750** |
-| **OVERALL** | **Full Pipeline** | **51** | **49** | **100.0%** | **96.1%** | **0.980** |
-
-*False Positive Rate on Clean Negative Control Screens:* **0.0% (0 false alarms triggered across telemetry, code editor, API docs, and system settings screens).**
+| **Tensor Input Shape** | `[1, 3, 640, 640]` (Fixed) | `[1, 3, 640, 640]` (Fixed Static) |
+| **Model Size on Disk** | 4.54 MB | **1.27 MB** |
+| **Compression Ratio** | Baseline (1.0x) | **3.57x (72.0% size reduction)** |
+| **Weight Representation** | Float32 | Dynamic QUInt8 (Quantized Unsigned Int8) |
+| **Mean Absolute Error (MAE)** | 0.000000 | **0.003383** |
+| **Inference Provider (Local)** | CPUExecutionProvider | CPUExecutionProvider (Fallback Verified) |
 
 ---
 
-## 5. Quickstart Guide
+## 7. Synthetic Dataset Distribution & Classification Benchmarks
+
+### Dataset Category Composition (20 Images, 51 PII Entities)
+
+```mermaid
+pie title Synthetic Dataset Category Distribution
+    "Email Clients (4 images)" : 12
+    "KYC Onboarding Forms (4 images)" : 12
+    "Banking Dashboards (4 images)" : 16
+    "Customer Support Chat (4 images)" : 11
+    "Clean Negative Controls (4 images)" : 0
+```
+
+### PII Classification Performance Table
+
+| PII Category | Validation Method & Rules | Ground Truth | True Positives (TP) | False Positives (FP) | Precision | Recall | F1 Score |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **AADHAAR** | Regex `\d{4}\s?\d{4}\s?\d{4}` + **Verhoeff Checksum** | 5 | 5 | 0 | **100.0%** | **100.0%** | **1.000** |
+| **PAN** | Regex `[A-Z]{5}\d{4}[A-Z]{1}` | 5 | 5 | 0 | **100.0%** | **100.0%** | **1.000** |
+| **UPI_ID** | Known bank handle whitelist (`@okhdfcbank`, `@oksbi`, etc.) | 8 | 8 | 0 | **100.0%** | **100.0%** | **1.000** |
+| **PHONE_IN** | Regex `(\+91[\-\s]?)?[6-9]\d{9}` | 12 | 12 | 0 | **100.0%** | **100.0%** | **1.000** |
+| **IFSC** | Regex `[A-Z]{4}0[A-Z0-9]{6}` | 5 | 5 | 0 | **100.0%** | **100.0%** | **1.000** |
+| **EMAIL** | RFC 5322 Standard Email Pattern | 11 | 11 | 0 | **100.0%** | **100.0%** | **1.000** |
+| **CARD_NUMBER** | Regex + **Luhn Checksum** | 5 | 3 | 0 | **100.0%** | **60.0%** | **0.750** |
+| **OVERALL** | **Full Pipeline** | **51** | **49** | **0** | **100.0%** | **96.1%** | **0.980** |
+
+### Negative Control Evaluation (False Positive Rate)
+
+| Clean Control Category | Sample Test Image | Evaluated Features | Ground Truth PII | Detected PII (FP) | Error Rate |
+|---|---|---|:---:|:---:|:---:|
+| **Cluster Telemetry** | `clean_analytics_01.png` | CPU / Memory metrics, P99 latencies | 0 | 0 | **0.0%** |
+| **Source Code Editor** | `clean_code_editor_02.png` | Python Dijkstra algorithm implementation | 0 | 0 | **0.0%** |
+| **API Documentation** | `clean_docs_page_03.png` | REST endpoints, vector index parameters | 0 | 0 | **0.0%** |
+| **Hardware Settings** | `clean_settings_04.png` | Resolution, display frequency, audio bus | 0 | 0 | **0.0%** |
+
+- **Total Clean Screens Evaluated:** 4
+- **False Positives Triggered:** **0 (0.0% false-positive rate)**
+
+---
+
+## 8. Deterministic Validation Decision Logic
+
+```mermaid
+flowchart LR
+    Text["Candidate OCR Text Token"] --> Step1{"Is 12-Digit Numeric Sequence?"}
+    Step1 -- Yes --> Step1A{"Passes Verhoeff Algorithm?"}
+    Step1A -- Yes --> Res1["Classified: AADHAAR<br/>Confidence: 1.0"]
+    Step1A -- No --> Step2
+
+    Step1 -- No --> Step2{"Matches [A-Z]{5}[0-9]{4}[A-Z]?"}
+    Step2 -- Yes --> Res2["Classified: PAN<br/>Confidence: 0.8"]
+    Step2 -- No --> Step3
+
+    Step3{"Contains @ Handle?"}
+    Step3 -- Yes --> Step3A{"Suffix in Known Bank Whitelist?"}
+    Step3A -- Yes --> Res3["Classified: UPI_ID<br/>Confidence: 0.8"]
+    Step3A -- No --> Step3B{"Matches RFC 5322 Email?"}
+    Step3B -- Yes --> Res4["Classified: EMAIL<br/>Confidence: 0.8"]
+    Step3B -- No --> Step4
+
+    Step3 -- No --> Step4{"Matches Indian Mobile (+91/6-9)?"}
+    Step4 -- Yes --> Res5["Classified: PHONE_IN<br/>Confidence: 0.8"]
+    Step4 -- No --> Step5
+
+    Step5{"Matches [A-Z]{4}0[A-Z0-9]{6}?"}
+    Step5 -- Yes --> Res6["Classified: IFSC<br/>Confidence: 0.8"]
+    Step5 -- No --> Step6
+
+    Step6{"Is 13-19 Digits & Passes Luhn?"}
+    Step6 -- Yes --> Res7["Classified: CARD_NUMBER<br/>Confidence: 1.0"]
+    Step6 -- No --> Res8["Unclassified / Non-Sensitive Text"]
+```
+
+---
+
+## 9. Visual Redaction Demonstration
+
+```
+BEFORE REDACTION (Raw Screen Capture):
++-------------------------------------------------------------------------------+
+| Identity Verification Form                                                    |
+| Name: Rajesh Ramanathan                                                       |
+| PAN Number:      ABCDE1234F                                                   |
+| Aadhaar UID:     9876 5432 1012                                               |
+| Contact Phone:   +91 9123456789                                               |
+| Primary UPI:     rajesh@okhdfcbank                                            |
++-------------------------------------------------------------------------------+
+
+AFTER REDACTION (Masked Output):
++-------------------------------------------------------------------------------+
+| Identity Verification Form                                                    |
+| Name: Rajesh Ramanathan                                                       |
+| PAN Number:      [██████████] <- Classified: PAN (conf: 0.8)                  |
+| Aadhaar UID:     [██████████████] <- Classified: AADHAAR (conf: 1.0)          |
+| Contact Phone:   [██████████████] <- Classified: PHONE_IN (conf: 0.8)         |
+| Primary UPI:     [████████████████] <- Classified: UPI_ID (conf: 0.8)         |
++-------------------------------------------------------------------------------+
+```
+
+---
+
+## 10. Quickstart Guide
 
 ### 1. Installation
 ```bash
@@ -125,7 +283,7 @@ jupyter notebook phase1_notebook.ipynb
 
 ---
 
-## 6. Code Examples
+## 11. Code Examples
 
 ### Standalone PII Classifier (Zero Dependencies)
 ```python
@@ -142,7 +300,7 @@ for r in results:
 ```python
 from inference_wrapper import ScreenPIIPipeline
 
-# Automatically picks QNNExecutionProvider on Snapdragon, or falls back to CPU
+# Automatically selects QNNExecutionProvider on Snapdragon, or falls back to CPU
 pipeline = ScreenPIIPipeline(detector_path="detector_quantized.onnx")
 results = pipeline.run_on_image("synthetic_test_set/email_client_01.png")
 
@@ -152,6 +310,6 @@ print(f"Detected PII entities: {results['pii_findings']}")
 
 ---
 
-## 7. License
+## 12. License
 
 MIT License — Copyright (c) 2026 vijayraj. See [LICENSE](LICENSE) for details.
