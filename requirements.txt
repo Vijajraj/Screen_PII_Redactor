@@ -9,3 +9,4 @@ jupyter>=1.0.0
 hypothesis>=6.0.0
 ruff>=0.4.0
 mypy>=1.0.0
+mss>=9.0.1
