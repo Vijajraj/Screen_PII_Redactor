@@ -24,7 +24,7 @@ Phase 1 successfully establishes the on-device PII detection and redaction found
 | **Quantization Scheme** | FP32 | Dynamic INT8 (QUInt8) | Zero manual calibration required |
 | **Mean Absolute Error (MAE)** | Baseline (0.000000) | **0.003383** | < 0.35% drift across probability maps |
 | **Max Absolute Error** | Baseline (0.000000) | **1.0** | Localized to sharp boundary contours |
-| **Local CPU Latency (Avg)** | **80.12 ms** | **130.99 ms** | Evaluated on x86_64 host CPU |
+| **Local CPU Latency (Avg)** | **82.91 ms** | **148.28 ms** | Evaluated on x86_64 host CPU |
 
 ---
 

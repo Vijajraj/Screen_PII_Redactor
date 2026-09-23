@@ -3,7 +3,7 @@
 **On-Device Sensitive PII Detection & Redaction for Indian & Universal Identifiers**  
 *Snapdragon AI Lab Challenge — Phase 1: Model Build & Export (Local)*
 
-[![Tests](https://img.shields.io/badge/tests-187%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-210%20passed-brightgreen.svg)]()
 [![Model](https://img.shields.io/badge/ONNX-Static%20640x640-blue.svg)]()
 [![Quantization](https://img.shields.io/badge/INT8-1.27%20MB%20(3.57x)-orange.svg)]()
 [![Phase 2](https://img.shields.io/badge/Phase%202-Live%20Capture%20%26%20Demo-success.svg)]()
