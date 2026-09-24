@@ -337,12 +337,39 @@ class LivePIIRedactorApp:
         w, h = self.capture_source.get_dimensions()
         print(f"  Capture area initialized: {w}x{h}")
 
-    def process_frame(self, frame_bgr: np.ndarray) -> tuple[np.ndarray, list[dict[str, Any]], dict[str, float]]:
+    def process_frame(
+        self,
+        frame_bgr: np.ndarray,
+        exclude_rect: tuple[int, int, int, int] | None = None,
+    ) -> tuple[np.ndarray, list[dict[str, Any]], dict[str, float]]:
         """
         Executes one full cycle on a frame:
-        preprocess/letterbox -> inference -> classify -> map coordinates -> apply redactions.
+        self-exclusion mask -> preprocess/letterbox -> inference -> classify -> map coordinates -> apply redactions.
         """
         t0 = time.perf_counter()
+
+        # Step 0: Apply Self-Exclusion Mask (eliminates hall-of-mirrors recursion)
+        if exclude_rect:
+            ex, ey, ew, eh = exclude_rect
+            h, w = frame_bgr.shape[:2]
+            x1 = max(0, min(w, ex))
+            y1 = max(0, min(h, ey))
+            x2 = max(0, min(w, ex + ew))
+            y2 = max(0, min(h, ey + eh))
+            if x2 > x1 + 20 and y2 > y1 + 20:
+                frame_bgr = frame_bgr.copy()
+                frame_bgr[y1:y2, x1:x2] = (30, 32, 38)
+                cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), (65, 70, 80), 2)
+                cv2.putText(
+                    frame_bgr,
+                    "Redactor Window (Excluded from Scan)",
+                    (x1 + 15, min(y2 - 15, y1 + 35)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (160, 165, 175),
+                    1,
+                    cv2.LINE_AA,
+                )
 
         # Step 1: Preprocess (Letterbox)
         if self.use_letterbox:
@@ -399,7 +426,16 @@ class LivePIIRedactorApp:
                     frame = self.capture_source.grab_frame()
                     t_cap = (time.perf_counter() - t_cap_start) * 1000.0
 
-                    redacted, findings, timings = self.process_frame(frame)
+                    # Calculate self-exclusion area for OpenCV window
+                    exclude_rect = None
+                    with contextlib.suppress(Exception):
+                        rect = cv2.getWindowImageRect(window_name)
+                        if rect and rect[2] > 0 and rect[3] > 0:
+                            cap_left = self.capture_source.monitor_area.get("left", 0)
+                            cap_top = self.capture_source.monitor_area.get("top", 0)
+                            exclude_rect = (rect[0] - cap_left, rect[1] - cap_top, rect[2] + 16, rect[3] + 40)
+
+                    redacted, findings, timings = self.process_frame(frame, exclude_rect=exclude_rect)
                     timings["capture_ms"] = t_cap
 
                     # Overlay HUD
@@ -524,6 +560,8 @@ class TkinterLiveViewer:
         self.root.bind("<Key-P>", lambda e: self.toggle_pause())
         self.root.bind("<Key-s>", lambda e: self.save_snapshot())
         self.root.bind("<Key-S>", lambda e: self.save_snapshot())
+        self.root.bind("<Key-r>", lambda e: self.prompt_region_select())
+        self.root.bind("<Key-R>", lambda e: self.prompt_region_select())
         self.root.protocol("WM_DELETE_WINDOW", self.on_quit)
 
         # Main image display container
@@ -532,7 +570,7 @@ class TkinterLiveViewer:
 
         # Bottom status bar
         self.status_var = tk.StringVar(
-            value="[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause/Resume  |  [S] Save Snapshot"
+            value="[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause  |  [S] Snapshot  |  [R] Select Region"
         )
         self.status_label = tk.Label(
             self.root,
@@ -560,7 +598,9 @@ class TkinterLiveViewer:
             self.status_label.configure(fg="#ffab00")
             print("Paused")
         else:
-            self.status_var.set("[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause  |  [S] Snapshot")
+            self.status_var.set(
+                "[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause  |  [S] Snapshot  |  [R] Select Region"
+            )
             self.status_label.configure(fg="#00e676")
             print("Resumed")
 
@@ -570,6 +610,22 @@ class TkinterLiveViewer:
             cv2.imwrite(out_name, self.current_display_frame)
             print(f"Saved snapshot to {out_name}")
             self.status_var.set(f"Saved snapshot to {Path(out_name).name}!")
+
+    def prompt_region_select(self) -> None:
+        """Allows interactive region selection while app is running."""
+        was_paused = self.paused
+        self.paused = True
+        self.root.withdraw()
+        new_region = select_roi_interactive()
+        self.root.deiconify()
+        if new_region:
+            print(f"Selected new capture region: {new_region}")
+            self.app.region = new_region
+            self.app.initialize_capture()
+            self.status_var.set(
+                f"[REGION ACTIVE] {new_region['width']}x{new_region['height']} at ({new_region['left']},{new_region['top']}) | [R] Select Region"
+            )
+        self.paused = was_paused
 
     def step(self) -> None:
         if not self.running:
@@ -582,7 +638,19 @@ class TkinterLiveViewer:
             frame = self.app.capture_source.grab_frame()
             t_cap = (time.perf_counter() - t_cap_start) * 1000.0
 
-            redacted, findings, timings = self.app.process_frame(frame)
+            # Calculate window rect on desktop to eliminate hall-of-mirrors recursion
+            wx = self.root.winfo_x()
+            wy = self.root.winfo_y()
+            ww = self.root.winfo_width() + 16
+            wh = self.root.winfo_height() + 40
+
+            cap_left = self.app.capture_source.monitor_area.get("left", 0)
+            cap_top = self.app.capture_source.monitor_area.get("top", 0)
+            rel_x = wx - cap_left
+            rel_y = wy - cap_top
+            exclude_rect = (rel_x, rel_y, ww, wh) if (ww > 20 and wh > 20) else None
+
+            redacted, findings, timings = self.app.process_frame(frame, exclude_rect=exclude_rect)
             timings["capture_ms"] = t_cap
 
             display_frame = RedactionRenderer.render_hud(
@@ -745,6 +813,74 @@ def run_benchmark(num_frames: int = 20) -> dict[str, float]:
     return metrics
 
 
+def select_roi_interactive() -> dict[str, int] | None:
+    """
+    Opens a fullscreen semi-transparent click-and-drag overlay allowing the user
+    to select any window, document, or screen sub-region to redact.
+    """
+    import tkinter as tk
+
+    selected_rect: dict[str, int] | None = None
+    try:
+        root = tk.Tk()
+        root.attributes("-fullscreen", True)
+        root.attributes("-alpha", 0.30)
+        root.configure(bg="#000000")
+        root.config(cursor="cross")
+
+        canvas = tk.Canvas(root, cursor="cross", bg="#000000", highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+
+        screen_w = root.winfo_screenwidth()
+        canvas.create_text(
+            screen_w // 2,
+            60,
+            text="Click and drag to select screen region to redact. Press [Esc] to cancel.",
+            fill="#00e676",
+            font=("Segoe UI", 16, "bold"),
+        )
+
+        start_x, start_y = 0, 0
+        rect_id = None
+
+        def on_press(event: Any) -> None:
+            nonlocal start_x, start_y, rect_id
+            start_x, start_y = event.x, event.y
+            if rect_id:
+                canvas.delete(rect_id)
+            rect_id = canvas.create_rectangle(start_x, start_y, start_x, start_y, outline="#00e676", width=2)
+
+        def on_drag(event: Any) -> None:
+            nonlocal rect_id
+            if rect_id:
+                canvas.coords(rect_id, start_x, start_y, event.x, event.y)
+
+        def on_release(event: Any) -> None:
+            nonlocal selected_rect
+            end_x, end_y = event.x, event.y
+            x1, x2 = min(start_x, end_x), max(start_x, end_x)
+            y1, y2 = min(start_y, end_y), max(start_y, end_y)
+            w, h = x2 - x1, y2 - y1
+            if w > 30 and h > 30:
+                selected_rect = {"left": x1, "top": y1, "width": w, "height": h}
+            root.destroy()
+
+        def on_cancel(event: Any = None) -> None:
+            root.destroy()
+
+        canvas.bind("<ButtonPress-1>", on_press)
+        canvas.bind("<B1-Motion>", on_drag)
+        canvas.bind("<ButtonRelease-1>", on_release)
+        root.bind("<Escape>", on_cancel)
+
+        root.mainloop()
+    except Exception as e:
+        print(f"[Notice] Interactive ROI selector unavailable: {e}")
+        return None
+
+    return selected_rect
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Screen PII Redactor — Phase 2 Live Capture Application")
     parser.add_argument(
@@ -777,6 +913,11 @@ def main() -> None:
         help="Capture sub-region: left top width height",
     )
     parser.add_argument(
+        "--select-region",
+        action="store_true",
+        help="Interactively click and drag to select screen region before starting",
+    )
+    parser.add_argument(
         "--backend",
         choices=["auto", "opencv", "tkinter", "headless"],
         default="auto",
@@ -797,7 +938,13 @@ def main() -> None:
         return
 
     region_dict = None
-    if args.region:
+    if args.select_region:
+        print("\nOpening interactive region selector. Click and drag over your document...")
+        region_dict = select_roi_interactive()
+        if region_dict:
+            print(f"Selected region: {region_dict}")
+
+    if region_dict is None and args.region:
         left, top, width, height = args.region
         region_dict = {"left": left, "top": top, "width": width, "height": height}
 

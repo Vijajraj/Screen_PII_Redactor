@@ -64,10 +64,10 @@ Evaluated across 20 synthetic desktop application screenshots comprising **51 gr
 
 ```python
 TARGET_PROVIDER_PRIORITY = [
-    "QNNExecutionProvider",     # Snapdragon Hexagon NPU (Submission Target)
-    "NNAPIExecutionProvider",   # Android NPU / DSP
+    "QNNExecutionProvider",  # Snapdragon Hexagon NPU (Submission Target)
+    "NNAPIExecutionProvider",  # Android NPU / DSP
     "CoreMLExecutionProvider",  # Apple Neural Engine
-    "CPUExecutionProvider"      # Universal Fallback
+    "CPUExecutionProvider",  # Universal Fallback
 ]
 ```
 
