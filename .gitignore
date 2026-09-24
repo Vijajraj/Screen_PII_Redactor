@@ -35,3 +35,4 @@ htmlcov/
 # Caches & Temp
 models/.cache/
 test_sample.png
+redaction_snapshot*.png

@@ -13,6 +13,7 @@ Section 3.2 Specification:
 """
 
 import os
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -22,6 +23,19 @@ from PIL import Image
 
 # Import the portable PII classifier deliverable
 from pii_classifier import classify_text
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+
+def resolve_model_path(path: str) -> str:
+    """Resolves model path relative to project root if not found in current directory."""
+    if os.path.exists(path):
+        return path
+    candidate = PROJECT_ROOT / path
+    if candidate.exists():
+        return str(candidate)
+    return path
+
 
 # =====================================================================
 # 1. EXECUTION PROVIDER ABSTRACTION LAYER (Section 3.2)
@@ -81,7 +95,7 @@ class PPOCRv4Detector:
         unclip_ratio: float = 1.5,
         max_candidates: int = 1000,
     ):
-        self.model_path = model_path
+        self.model_path = resolve_model_path(model_path)
         self.thresh = thresh
         self.box_thresh = box_thresh
         self.unclip_ratio = unclip_ratio
@@ -197,7 +211,8 @@ class PPOCRv4Recognizer:
         dict_path: str = "models/rec/english/dict.txt",
         providers: list[str] | None = None,
     ):
-        self.model_path = model_path
+        self.model_path = resolve_model_path(model_path)
+        dict_path = resolve_model_path(dict_path)
         self.providers, _ = resolve_execution_providers(providers)
 
         # Load dictionary
@@ -207,7 +222,7 @@ class PPOCRv4Recognizer:
         else:
             self.character = []
 
-        if os.path.exists(model_path):
+        if os.path.exists(self.model_path):
             self.session = ort.InferenceSession(self.model_path, providers=self.providers)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name

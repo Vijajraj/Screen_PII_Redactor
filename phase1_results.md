@@ -24,7 +24,7 @@ Phase 1 successfully establishes the on-device PII detection and redaction found
 | **Quantization Scheme** | FP32 | Dynamic INT8 (QUInt8) | Zero manual calibration required |
 | **Mean Absolute Error (MAE)** | Baseline (0.000000) | **0.003383** | < 0.35% drift across probability maps |
 | **Max Absolute Error** | Baseline (0.000000) | **1.0** | Localized to sharp boundary contours |
-| **Local CPU Latency (Avg)** | **82.91 ms** | **148.28 ms** | Evaluated on x86_64 host CPU |
+| **Local CPU Latency (Avg)** | **85.51 ms** | **143.34 ms** | Evaluated on x86_64 host CPU |
 
 ---
 
@@ -64,10 +64,10 @@ Evaluated across 20 synthetic desktop application screenshots comprising **51 gr
 
 ```python
 TARGET_PROVIDER_PRIORITY = [
-    "QNNExecutionProvider",  # Snapdragon Hexagon NPU (Submission Target)
-    "NNAPIExecutionProvider",  # Android NPU / DSP
+    "QNNExecutionProvider",     # Snapdragon Hexagon NPU (Submission Target)
+    "NNAPIExecutionProvider",   # Android NPU / DSP
     "CoreMLExecutionProvider",  # Apple Neural Engine
-    "CPUExecutionProvider",  # Universal Fallback
+    "CPUExecutionProvider"      # Universal Fallback
 ]
 ```
 

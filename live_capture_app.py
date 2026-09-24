@@ -14,16 +14,21 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import os
+import sys
 import time
+from pathlib import Path
 from typing import Any
 
 import cv2
 import mss
 import numpy as np
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 # Phase 1 deliverables (imported directly, unmodified)
-from inference_wrapper import ScreenPIIPipeline, resolve_execution_providers
+from inference_wrapper import ScreenPIIPipeline, resolve_execution_providers  # noqa: E402
 
 # Color palette for PII types (BGR format)
 PII_COLORS: dict[str, tuple[int, int, int]] = {
@@ -71,9 +76,9 @@ class ScreenCaptureSource:
             return self._fallback_cache.copy()
 
         w, h = self.monitor_area["width"], self.monitor_area["height"]
-        sample_path = "synthetic_test_set/kyc_onboarding_01.png"
-        if os.path.exists(sample_path):
-            img = cv2.imread(sample_path)
+        sample_path = PROJECT_ROOT / "synthetic_test_set" / "kyc_onboarding_01.png"
+        if sample_path.exists():
+            img = cv2.imread(str(sample_path))
             if img is not None:
                 self._fallback_cache = cv2.resize(img, (w, h))
         if self._fallback_cache is None:
@@ -377,26 +382,13 @@ class LivePIIRedactorApp:
         }
         return redacted_frame, mapped_pii, timings
 
-    def run_live_monitor(self, max_frames: int | None = None) -> None:
-        """
-        Runs the live screen capture monitor in an interactive OpenCV window.
-        Controls:
-          - 'q': quit
-          - 's': save snapshot
-          - 'p': pause/resume
-        """
-        if self.capture_source is None:
-            self.initialize_capture()
-
+    def _run_opencv_monitor(self, window_name: str, max_frames: int | None = None) -> None:
         assert self.capture_source is not None
-        window_name = f"Screen PII Redactor [{self.active_provider}]"
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-
         frame_count = 0
         fps = 0.0
         paused = False
 
-        print("\nStarting live capture loop. Press 'q' in the window to quit.\n")
+        print("\nStarting live capture loop (OpenCV HighGUI). Press 'q' in the window to quit.\n")
 
         try:
             while True:
@@ -435,7 +427,7 @@ class LivePIIRedactorApp:
                     paused = not paused
                     print("Paused" if paused else "Resumed")
                 elif key == ord("s"):
-                    out_name = f"redaction_snapshot_{int(time.time())}.png"
+                    out_name = str(PROJECT_ROOT / f"redaction_snapshot_{int(time.time())}.png")
                     cv2.imwrite(out_name, display_frame)
                     print(f"Saved snapshot to {out_name}")
 
@@ -447,6 +439,254 @@ class LivePIIRedactorApp:
             cv2.destroyAllWindows()
             if self.capture_source:
                 self.capture_source.close()
+
+    def run_live_monitor(self, max_frames: int | None = None, backend: str = "auto") -> None:
+        """
+        Runs the live screen capture monitor with resilient multi-backend display support:
+          1. OpenCV HighGUI window (fast native C++ window)
+          2. Tkinter window (universal Python fallback, works when opencv-python-headless is installed)
+          3. Headless Console Monitor (pure CLI for headless / server environments)
+        """
+        if self.capture_source is None:
+            self.initialize_capture()
+
+        # 1. Explicit headless request
+        if backend == "headless":
+            run_headless_monitor(self, max_frames=max_frames)
+            return
+
+        # 2. Try OpenCV HighGUI (if backend is auto or opencv)
+        if backend in ("auto", "opencv"):
+            try:
+                window_name = f"Screen PII Redactor [{self.active_provider}]"
+                cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+                self._run_opencv_monitor(window_name, max_frames=max_frames)
+                return
+            except (cv2.error, Exception) as cv_err:
+                if backend == "opencv":
+                    raise
+                print(
+                    f"\n[Notice] OpenCV GUI window unavailable ({type(cv_err).__name__}). "
+                    "Switching to native Tkinter display backend."
+                )
+
+        # 3. Try Native Tkinter Window (if backend is auto or tkinter)
+        if backend in ("auto", "tkinter"):
+            try:
+                viewer = TkinterLiveViewer(self, max_frames=max_frames)
+                viewer.run()
+                return
+            except Exception as tk_err:
+                if backend == "tkinter":
+                    raise
+                print(f"\n[Notice] Tkinter display unavailable ({tk_err}). Switching to Headless Console Monitor.")
+
+        # 4. Fallback to Headless Console Monitor
+        run_headless_monitor(self, max_frames=max_frames)
+
+
+class TkinterLiveViewer:
+    """
+    Native Tkinter fallback viewer when OpenCV HighGUI is not available (e.g. opencv-python-headless).
+    Displays the live redacted stream with telemetry HUD, supporting key controls:
+      - 'q' or Escape: quit
+      - 's': save snapshot
+      - 'p': pause/resume
+    """
+
+    def __init__(self, app: LivePIIRedactorApp, max_frames: int | None = None) -> None:
+        self.app = app
+        self.max_frames = max_frames
+        self.frame_count = 0
+        self.paused = False
+        self.running = True
+        self.fps = 0.0
+        self.current_display_frame: np.ndarray | None = None
+        self._photo_image: Any = None
+
+        import tkinter as tk
+
+        from PIL import Image, ImageTk
+
+        self.tk = tk
+        self.Image = Image
+        self.ImageTk = ImageTk
+
+        self.root = tk.Tk()
+        self.root.title(f"Screen PII Redactor [{self.app.active_provider}] — Native Display")
+        self.root.configure(bg="#121212")
+
+        # Setup key bindings
+        self.root.bind("<Key-q>", lambda e: self.on_quit())
+        self.root.bind("<Key-Q>", lambda e: self.on_quit())
+        self.root.bind("<Escape>", lambda e: self.on_quit())
+        self.root.bind("<Key-p>", lambda e: self.toggle_pause())
+        self.root.bind("<Key-P>", lambda e: self.toggle_pause())
+        self.root.bind("<Key-s>", lambda e: self.save_snapshot())
+        self.root.bind("<Key-S>", lambda e: self.save_snapshot())
+        self.root.protocol("WM_DELETE_WINDOW", self.on_quit)
+
+        # Main image display container
+        self.image_label = tk.Label(self.root, bg="#121212")
+        self.image_label.pack(fill=tk.BOTH, expand=True)
+
+        # Bottom status bar
+        self.status_var = tk.StringVar(
+            value="[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause/Resume  |  [S] Save Snapshot"
+        )
+        self.status_label = tk.Label(
+            self.root,
+            textvariable=self.status_var,
+            bg="#18181b",
+            fg="#00e676",
+            font=("Consolas", 10, "bold"),
+            anchor="w",
+            padx=12,
+            pady=6,
+        )
+        self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def on_quit(self) -> None:
+        self.running = False
+        with contextlib.suppress(Exception):
+            self.root.destroy()
+        if self.app.capture_source:
+            self.app.capture_source.close()
+
+    def toggle_pause(self) -> None:
+        self.paused = not self.paused
+        if self.paused:
+            self.status_var.set("[PAUSED] Live Redactor paused. Controls: [P] Resume  |  [Q/Esc] Quit  |  [S] Snapshot")
+            self.status_label.configure(fg="#ffab00")
+            print("Paused")
+        else:
+            self.status_var.set("[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause  |  [S] Snapshot")
+            self.status_label.configure(fg="#00e676")
+            print("Resumed")
+
+    def save_snapshot(self) -> None:
+        if self.current_display_frame is not None:
+            out_name = str(PROJECT_ROOT / f"redaction_snapshot_{int(time.time())}.png")
+            cv2.imwrite(out_name, self.current_display_frame)
+            print(f"Saved snapshot to {out_name}")
+            self.status_var.set(f"Saved snapshot to {Path(out_name).name}!")
+
+    def step(self) -> None:
+        if not self.running:
+            return
+
+        cycle_start = time.perf_counter()
+
+        if not self.paused and self.app.capture_source:
+            t_cap_start = time.perf_counter()
+            frame = self.app.capture_source.grab_frame()
+            t_cap = (time.perf_counter() - t_cap_start) * 1000.0
+
+            redacted, findings, timings = self.app.process_frame(frame)
+            timings["capture_ms"] = t_cap
+
+            display_frame = RedactionRenderer.render_hud(
+                redacted,
+                provider=self.app.active_provider,
+                latency_ms=timings["total_ms"],
+                fps=self.fps,
+                detected_count=len(findings),
+                interval_s=self.app.interval,
+            )
+            self.current_display_frame = display_frame
+            self.frame_count += 1
+
+            # Downscale dynamically to fit comfortably within 1280x720 window if screen is large
+            disp_h, disp_w = display_frame.shape[:2]
+            max_w, max_h = 1280, 720
+            if disp_w > max_w or disp_h > max_h:
+                scale = min(max_w / disp_w, max_h / disp_h)
+                new_w, new_h = max(1, int(disp_w * scale)), max(1, int(disp_h * scale))
+                render_img = cv2.resize(display_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            else:
+                render_img = display_frame
+
+            rgb = cv2.cvtColor(render_img, cv2.COLOR_BGR2RGB)
+            pil_img = self.Image.fromarray(rgb)
+            self._photo_image = self.ImageTk.PhotoImage(image=pil_img)
+            self.image_label.configure(image=self._photo_image)
+
+        elapsed = time.perf_counter() - cycle_start
+        self.fps = 1.0 / elapsed if elapsed > 0 else 0.0
+
+        if self.max_frames and self.frame_count >= self.max_frames:
+            print(f"Reached max frames limit ({self.max_frames}). Exiting Tkinter viewer.")
+            self.on_quit()
+            return
+
+        delay_ms = max(10, int((self.app.interval - elapsed) * 1000)) if not self.paused else 50
+        if self.running:
+            self.root.after(delay_ms, self.step)
+
+    def run(self) -> None:
+        print("\nStarting live capture loop (Native Tkinter Window).")
+        print("Controls in window: [q] or [Esc] to quit, [p] to pause/resume, [s] to save snapshot.\n")
+        self.root.after(10, self.step)
+        try:
+            self.root.mainloop()
+        finally:
+            if self.app.capture_source:
+                self.app.capture_source.close()
+
+
+def run_headless_monitor(app: LivePIIRedactorApp, max_frames: int | None = None) -> None:
+    """
+    Console-only fallback when no display server (OpenCV HighGUI or Tkinter) is available.
+    Monitors live capture, logs PII detections, and saves snapshots periodically.
+    """
+    print("\nRunning in Headless Console Monitor mode (no GUI display server detected).")
+    print("Press Ctrl+C to terminate.\n")
+    if app.capture_source is None:
+        app.initialize_capture()
+
+    assert app.capture_source is not None
+    frame_count = 0
+
+    try:
+        while True:
+            t0 = time.perf_counter()
+            frame = app.capture_source.grab_frame()
+            redacted, findings, timings = app.process_frame(frame)
+            frame_count += 1
+            elapsed = time.perf_counter() - t0
+            fps = 1.0 / elapsed if elapsed > 0 else 0.0
+
+            pii_summary = ", ".join(f"{f['type']}" for f in findings) if findings else "None"
+            print(
+                f"[Frame {frame_count:03d}] Latency: {timings['total_ms']:5.1f}ms | "
+                f"FPS: {fps:4.1f} | Detections: {len(findings)} ({pii_summary})"
+            )
+
+            # Save snapshot of first frame or whenever PII is detected
+            if frame_count == 1 or findings:
+                out_path = PROJECT_ROOT / "redaction_snapshot_latest.png"
+                display_frame = RedactionRenderer.render_hud(
+                    redacted,
+                    provider=app.active_provider,
+                    latency_ms=timings["total_ms"],
+                    fps=fps,
+                    detected_count=len(findings),
+                    interval_s=app.interval,
+                )
+                cv2.imwrite(str(out_path), display_frame)
+
+            if max_frames and frame_count >= max_frames:
+                print(f"Reached max frames limit ({max_frames}).")
+                break
+
+            sleep_time = max(0.01, app.interval - (time.perf_counter() - t0))
+            time.sleep(sleep_time)
+
+    except KeyboardInterrupt:
+        print("\nHeadless monitor stopped by user.")
+    finally:
+        if app.capture_source:
+            app.capture_source.close()
 
 
 def run_benchmark(num_frames: int = 20) -> dict[str, float]:
@@ -536,6 +776,12 @@ def main() -> None:
         metavar=("LEFT", "TOP", "WIDTH", "HEIGHT"),
         help="Capture sub-region: left top width height",
     )
+    parser.add_argument(
+        "--backend",
+        choices=["auto", "opencv", "tkinter", "headless"],
+        default="auto",
+        help="Display backend: auto (default: auto-detects best GUI), opencv, tkinter, or headless",
+    )
 
     args = parser.parse_args()
 
@@ -556,7 +802,7 @@ def main() -> None:
         region_dict = {"left": left, "top": top, "width": width, "height": height}
 
     app = LivePIIRedactorApp(interval=args.interval, region=region_dict)
-    app.run_live_monitor(max_frames=args.frames)
+    app.run_live_monitor(max_frames=args.frames, backend=args.backend)
 
 
 if __name__ == "__main__":

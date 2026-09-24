@@ -11,12 +11,18 @@ Produces:
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 
 import cv2
 import numpy as np
 from PIL import Image
 
-from live_capture_app import LivePIIRedactorApp, RedactionRenderer
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from live_capture_app import LivePIIRedactorApp, RedactionRenderer  # noqa: E402
 
 
 def create_title_card(width: int, height: int, frame_idx: int, total_frames: int) -> np.ndarray:
@@ -111,14 +117,17 @@ def create_summary_card(width: int, height: int, metrics: dict[str, float]) -> n
 
 
 def record_demo_video(
-    output_mp4: str = "demo_video.mp4",
-    output_gif: str = "demo_video.gif",
+    output_mp4: str | None = None,
+    output_gif: str | None = None,
     fps: int = 10,
 ) -> tuple[str, str]:
     """
     Creates a 30-second multi-scene demo video showcasing startup,
     KYC redaction, Banking redaction, Chat redaction, and clean desktop FP controls.
     """
+    out_mp4 = output_mp4 or str(PROJECT_ROOT / "demo_video.mp4")
+    out_gif = output_gif or str(PROJECT_ROOT / "demo_video.gif")
+
     print("=" * 60)
     print("GENERATING AUTOMATED 30-SECOND PHASE 2 DEMO VIDEO & GIF")
     print("=" * 60)
@@ -128,10 +137,16 @@ def record_demo_video(
 
     # Scenarios to showcase
     scenarios = [
-        ("synthetic_test_set/kyc_onboarding_01.png", "SCENE 1: KYC Onboarding (Aadhaar & PAN)"),
-        ("synthetic_test_set/banking_dashboard_01.png", "SCENE 2: Banking Portal (Card Number & IFSC)"),
-        ("synthetic_test_set/chat_support_01.png", "SCENE 3: Support Chat (UPI ID & Phone Number)"),
-        ("synthetic_test_set/clean_analytics_01.png", "SCENE 4: False-Positive Control (Clean Desktop / Logs)"),
+        (str(PROJECT_ROOT / "synthetic_test_set/kyc_onboarding_01.png"), "SCENE 1: KYC Onboarding (Aadhaar & PAN)"),
+        (
+            str(PROJECT_ROOT / "synthetic_test_set/banking_dashboard_01.png"),
+            "SCENE 2: Banking Portal (Card Number & IFSC)",
+        ),
+        (str(PROJECT_ROOT / "synthetic_test_set/chat_support_01.png"), "SCENE 3: Support Chat (UPI ID & Phone Number)"),
+        (
+            str(PROJECT_ROOT / "synthetic_test_set/clean_analytics_01.png"),
+            "SCENE 4: False-Positive Control (Clean Desktop / Logs)",
+        ),
     ]
 
     # Verify test files exist
@@ -226,17 +241,17 @@ def record_demo_video(
     print(f"\nGenerated {len(all_frames)} frames (~{total_duration_sec:.1f} seconds total).")
 
     # Encode MP4 Video
-    print(f"Writing MP4 video to {output_mp4}...")
+    print(f"Writing MP4 video to {out_mp4}...")
     fourcc = cv2.VideoWriter.fourcc(*"mp4v")
-    writer = cv2.VideoWriter(output_mp4, fourcc, fps, (target_w, target_h))
+    writer = cv2.VideoWriter(out_mp4, fourcc, fps, (target_w, target_h))
     for f in all_frames:
         writer.write(f)
     writer.release()
-    mp4_size_mb = os.path.getsize(output_mp4) / (1024 * 1024)
-    print(f"  [OK] Saved {output_mp4} ({mp4_size_mb:.2f} MB)")
+    mp4_size_mb = os.path.getsize(out_mp4) / (1024 * 1024)
+    print(f"  [OK] Saved {out_mp4} ({mp4_size_mb:.2f} MB)")
 
     # Encode Animated GIF
-    print(f"Writing animated GIF preview to {output_gif}...")
+    print(f"Writing animated GIF preview to {out_gif}...")
     # Downsample slightly for optimal GIF file size and web rendering
     gif_w, gif_h = 640, 400
     # Sample every 2nd frame for smooth 5 fps GIF animation
@@ -247,22 +262,22 @@ def record_demo_video(
 
     if gif_frames:
         gif_frames[0].save(
-            output_gif,
+            out_gif,
             save_all=True,
             append_images=gif_frames[1:],
             duration=int(1000 / (fps / 2)),
             loop=0,
             optimize=True,
         )
-        gif_size_mb = os.path.getsize(output_gif) / (1024 * 1024)
-        print(f"  [OK] Saved {output_gif} ({gif_size_mb:.2f} MB)")
+        gif_size_mb = os.path.getsize(out_gif) / (1024 * 1024)
+        print(f"  [OK] Saved {out_gif} ({gif_size_mb:.2f} MB)")
 
     print("=" * 60)
     print("DEMO RECORDING COMPLETE!")
-    print(f"  MP4: {os.path.abspath(output_mp4)}")
-    print(f"  GIF: {os.path.abspath(output_gif)}")
+    print(f"  MP4: {os.path.abspath(out_mp4)}")
+    print(f"  GIF: {os.path.abspath(out_gif)}")
     print("=" * 60)
-    return output_mp4, output_gif
+    return out_mp4, out_gif
 
 
 if __name__ == "__main__":

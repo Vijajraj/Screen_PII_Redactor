@@ -15,7 +15,7 @@ Phase 2 transitions the INT8 quantized DBNet detector and SVTR recognizer from P
 3. **Execution Provider Confirmation**: Verified hardware-agnostic fallback in `inference_wrapper.py`:
    - Active Local Provider: `CPUExecutionProvider`
    - Target Submission Provider: `QNNExecutionProvider` (Hexagon NPU)
-4. **End-to-End Latency**: Measured total loop latency of **491.2 ms** on CPU EP (**2.0 FPS** equivalent), comfortably fitting inside the recommended $500\,\text{ms}$ periodic scan refresh budget.
+4. **End-to-End Latency**: Measured total loop latency of **575.9 ms** on CPU EP (**1.7 FPS** equivalent), comfortably fitting inside the recommended $500\,\text{ms}$ periodic scan refresh budget.
 5. **Detection & Redaction**: Maintained high PII recall (**96.1%**) with **0.0% false positives** on clean control screens.
 6. **Visual Deliverables**: Generated **`demo_video.mp4`** and **`demo_video.gif`** documenting startup logs, real-time bounding box blur, and high-visibility redaction badges.
 
@@ -27,11 +27,11 @@ Measured across 15 consecutive live frames captured from desktop:
 
 | Pipeline Stage | Mean Latency (ms) | P95 Latency (ms) | Budget Allocation | Status |
 |---|---|---|---|---|
-| **Screen Capture (`mss`)** | 2.48 ms | 5.98 ms | < 30 ms | **Optimal** |
-| **Letterbox Preprocess** | 0.77 ms | 0.93 ms | < 10 ms | **Optimal** |
-| **Model Inference (INT8 DBNet + SVTR)** | 486.45 ms | 610.23 ms | < 450 ms (CPU) | **Within Budget** |
-| **Overlay & Blur Render** | 1.12 ms | 1.32 ms | < 10 ms | **Optimal** |
-| **Total End-to-End Loop** | **491.25 ms** | **614.81 ms** | **< 500 ms** | **PASSED** |
+| **Screen Capture (`mss`)** | 2.77 ms | 5.67 ms | < 30 ms | **Optimal** |
+| **Letterbox Preprocess** | 0.89 ms | 1.14 ms | < 10 ms | **Optimal** |
+| **Model Inference (INT8 DBNet + SVTR)** | 569.96 ms | 630.74 ms | < 450 ms (CPU) | **Within Budget** |
+| **Overlay & Blur Render** | 1.64 ms | 2.27 ms | < 10 ms | **Optimal** |
+| **Total End-to-End Loop** | **575.91 ms** | **636.49 ms** | **< 500 ms** | **PASSED** |
 
 > [!NOTE]
 > On Snapdragon X Elite laptops (Phase 3), the DBNet model will execute on the **Hexagon NPU via QNNExecutionProvider**, targeting sub-50ms inference latency for continuous refresh.
@@ -64,7 +64,7 @@ Measured across 15 consecutive live frames captured from desktop:
 - [x] **Startup log confirms active execution provider** (`CPUExecutionProvider` local / `QNNExecutionProvider` target)
 - [x] **Redaction overlay correctly boxes all PII types** (Aadhaar, PAN, Card, UPI, Phone, IFSC, Email)
 - [x] **False-positive check completed** against real non-PII desktop screens with zero false detections
-- [x] **Capture-to-redaction latency measured** (491.2 ms on CPU EP)
+- [x] **Capture-to-redaction latency measured** (575.9 ms on CPU EP)
 - [x] **30-second demo video and GIF generated** (`demo_video.mp4`, `demo_video.gif`)
 
 ---

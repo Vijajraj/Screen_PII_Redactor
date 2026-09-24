@@ -270,6 +270,11 @@ flowchart LR
 ### Key Capabilities
 - **Fast Desktop Capture (`mss`)**: Low-overhead frame acquisition (< 20 ms) supporting whole desktop or user-defined rectangular sub-regions.
 - **Letterbox Transformation**: Preserves text aspect ratios across widescreen and multi-monitor setups without stretching artifacts.
+- **Universal Cross-Device Display Architecture**: Automatically detects host environment and chooses the optimal display backend:
+  - **OpenCV HighGUI (Level 1)**: Native hardware-accelerated desktop window.
+  - **Native Tkinter Window (Level 2)**: Embedded Python GUI window that automatically activates if `opencv-python-headless` is installed or C++ GUI libraries are absent.
+  - **Headless Console Monitor (Level 3)**: Terminal telemetry stream for remote SSH servers and CI environments with no active display server.
+- **Working Directory Independence**: Automatic anchor resolution ensures scripts and models run out-of-the-box from any directory or system path.
 - **Visual Redaction Badges**: High-contrast, color-coded security banners with confidence scoring:
   - `[AADHAAR REDACTED 1.0]` (Crimson)
   - `[PAN REDACTED 0.8]` (Emerald)
@@ -279,6 +284,18 @@ flowchart LR
   - `[IFSC REDACTED 0.8]` (Teal)
 - **Gaussian Blurring**: Irreversible Gaussian kernel blurring ($k=31$) applied directly over raw sensitive text regions.
 - **Autonomous Demo Recording**: Built-in recorder generates both `demo_video.mp4` and `demo_video.gif` showcasing startup, KYC, banking, chat, and false-positive controls.
+
+### Display Backend Architecture
+
+```mermaid
+flowchart TD
+    Start["Launch live_capture_app.py"] --> Check["Backend Selection (auto / manual)"]
+    Check --> TryOpenCV{"Try OpenCV HighGUI<br/>(cv2.namedWindow)"}
+    TryOpenCV -- Available --> OpenCVWin["Level 1: Native HighGUI Window<br/>Fast C++ Frame Pipeline"]
+    TryOpenCV -- Headless / Unavailable --> TryTkinter{"Try Native Tkinter<br/>(tk.Tk + ImageTk)"}
+    TryTkinter -- Display Server Present --> TkWin["Level 2: Native Tkinter Window<br/>Universal Cross-Platform GUI"]
+    TryTkinter -- No Display / Remote SSH --> ConsoleMode["Level 3: Headless Console Monitor<br/>Terminal Telemetry + PNG Snapshots"]
+```
 
 ### Measured Latency Breakdown (CPUExecutionProvider)
 
@@ -294,7 +311,7 @@ flowchart LR
 
 | Deliverable | File Path | Scope & Purpose | Status |
 |---|---|---|:---:|
-| **Live Redactor Application** | [`live_capture_app.py`](live_capture_app.py) | Full application integrating `mss`, letterbox transformer, and redaction renderer | Complete |
+| **Live Redactor Application** | [`live_capture_app.py`](live_capture_app.py) | Full application integrating `mss`, letterbox transformer, Tkinter/OpenCV backends | Complete |
 | **30-Second Demo Video** | [`demo_video.mp4`](demo_video.mp4) | High-definition MP4 demo video covering startup, KYC, banking, chat, and clean desktop (2.07 MB) | Generated |
 | **Animated GIF Preview** | [`demo_video.gif`](demo_video.gif) | Lightweight animated GIF preview for README and visual inspection (0.23 MB) | Generated |
 | **Demo Recording Generator** | [`record_demo.py`](record_demo.py) | Autonomous demo video and GIF compilation pipeline | Complete |
@@ -362,11 +379,18 @@ pip install -r requirements.txt
 
 ### 2. Launch Live Screen PII Redactor
 ```bash
-# Launch interactive live screen monitor (press 'q' to quit, 's' to save snapshot)
+# Launch interactive live screen monitor (auto-detects OpenCV or Tkinter GUI)
 python live_capture_app.py --interval 0.5
+
+# Works seamlessly from ANY directory or command prompt
+python c:\projects\Screen_PII_Redactor\live_capture_app.py --interval 0.5
 
 # Capture a specific window / region (left top width height)
 python live_capture_app.py --region 100 100 800 600 --interval 0.5
+
+# Select explicit display backend: auto (default), opencv, tkinter, or headless
+python live_capture_app.py --backend tkinter --interval 0.5
+python live_capture_app.py --backend headless --frames 10
 ```
 
 ### 3. Generate 30-Second Demo Video & Animated GIF
@@ -394,7 +418,7 @@ jupyter notebook phase1_notebook.ipynb
 
 ---
 
-## 12. Code Examples
+## 13. Code Examples
 
 ### Standalone PII Classifier (Zero Dependencies)
 ```python
@@ -421,6 +445,6 @@ print(f"Detected PII entities: {results['pii_findings']}")
 
 ---
 
-## 13. License
+## 14. License
 
 MIT License — Copyright (c) 2026 vijayraj. See [LICENSE](LICENSE) for details.
