@@ -127,7 +127,7 @@ def run_phase3_evaluation(
         model=str(quant_model_path),
         device=device,
         name="Screen_PII_Detector_INT8_QNN",
-        options="--target_runtime qnn_context_binary",
+        options="--target_runtime precompiled_qnn_onnx",
     )
     print(f"  Job Submitted! ID: {compile_job.job_id}")
     print(f"  Job URL: https://aihub.qualcomm.com/jobs/{compile_job.job_id}")
@@ -224,7 +224,7 @@ def run_phase3_evaluation(
                 model=str(clean_fp32_path),
                 device=device,
                 name="Screen_PII_Detector_FP32_Baseline",
-                options="--target_runtime qnn_context_binary",
+                options="--target_runtime precompiled_qnn_onnx",
             )
             fp32_compiled = fp32_compile_job.get_target_model()
             fp32_profile_job = qai_hub.submit_profile_job(
