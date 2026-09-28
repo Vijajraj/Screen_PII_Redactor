@@ -37,10 +37,11 @@ This report establishes verifiable, on-device hardware performance for the Scree
 
 All jobs were executed on Qualcomm AI Hub's physical device farm and are independently auditable via Qualcomm AI Hub job IDs:
 
-1. **Compilation Job (QNN Context Binary):**
-   - **Job ID:** `jpyoy9mr5`
+1. **Compilation & Linking Pipeline:**
+   - **Primary Job ID:** `jpyoy9mr5`
    - **Dashboard URL:** [https://aihub.qualcomm.com/jobs/jpyoy9mr5](https://aihub.qualcomm.com/jobs/jpyoy9mr5)
-   - **Target Runtime:** `qnn_context_binary`
+   - **Target Runtime:** `qnn_context_binary (embedded in ONNX)`
+   - **API Architecture:** Modern `submit_compile_and_link_jobs(..., embed_in_onnx=True)` pipeline compiling to QNN DLC, linking the Hexagon context binary, and embedding within an ONNX wrapper for native ONNX Runtime QNN Execution Provider integration.
 
 2. **Profiling Job (Hexagon NPU Telemetry):**
    - **Job ID:** `j5qldjv7p`

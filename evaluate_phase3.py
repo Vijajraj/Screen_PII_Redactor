@@ -98,10 +98,112 @@ def prepare_sample_input(image_path: str) -> np.ndarray:
     return tensor.astype(np.float32)
 
 
+def compile_model_qnn(
+    model_path: str,
+    device: Any,
+    name: str,
+    force_legacy: bool = False,
+) -> tuple[Any, dict[str, Any]]:
+    """Compiles an ONNX model for Qualcomm Neural Network (QNN) targeting Snapdragon NPU.
+
+    Uses Qualcomm AI Hub's modern submit_compile_and_link_jobs API with embed_in_onnx=True,
+    which compiles to QNN DLC, links the context binary, and embeds it inside an ONNX wrapper
+    asset for direct execution via ONNX Runtime QNN Execution Provider.
+
+    Falls back to submit_compile_job with '--target_runtime precompiled_qnn_onnx' if
+    submit_compile_and_link_jobs is unavailable on older SDK environments or if force_legacy is True.
+
+    Returns:
+        tuple[target_model, job_telemetry_dict]
+    """
+    import qai_hub
+
+    # Try modern submit_compile_and_link_jobs API first
+    if not force_legacy and hasattr(qai_hub, "submit_compile_and_link_jobs"):
+        try:
+            print("  Submitting via submit_compile_and_link_jobs (embed_in_onnx=True)...")
+            jobs = qai_hub.submit_compile_and_link_jobs(
+                models=str(model_path),
+                device=device,
+                name=name,
+                embed_in_onnx=True,
+            )
+            # When device is a single device, jobs is (compile_jobs, link_job, embed_job)
+            if isinstance(jobs, tuple):
+                compile_jobs = jobs[0]
+                link_job = jobs[1] if len(jobs) > 1 else None
+                embed_job = jobs[2] if len(jobs) > 2 else None
+            elif isinstance(jobs, list) and len(jobs) > 0 and isinstance(jobs[0], tuple):
+                compile_jobs = jobs[0][0]
+                link_job = jobs[0][1] if len(jobs[0]) > 1 else None
+                embed_job = jobs[0][2] if len(jobs[0]) > 2 else None
+            else:
+                compile_jobs = jobs
+                link_job = None
+                embed_job = None
+
+            c_job = compile_jobs[0] if isinstance(compile_jobs, list) and len(compile_jobs) > 0 else compile_jobs
+            c_id = getattr(c_job, "job_id", "unknown")
+            l_id = getattr(link_job, "job_id", "none") if link_job is not None else "none"
+            e_id = getattr(embed_job, "job_id", "none") if embed_job is not None else "none"
+
+            print(f"  Compile Job ID (QNN DLC):            {c_id}")
+            if link_job is not None:
+                print(f"  Link Job ID (Context Binary):        {l_id}")
+            if embed_job is not None:
+                print(f"  Embed Job ID (ONNX Asset):           {e_id}")
+
+            # The final target model is the embedded ONNX model (or link_job target)
+            if embed_job is not None:
+                print("  Waiting for ONNX-embedded QNN asset...")
+                target_model = embed_job.get_target_model()
+                primary_job_id = e_id
+            elif link_job is not None:
+                print("  Waiting for linked QNN context binary...")
+                target_model = link_job.get_target_model()
+                primary_job_id = l_id
+            else:
+                print("  Waiting for compiled target model...")
+                target_model = c_job.get_target_model()
+                primary_job_id = c_id
+
+            job_telemetry = {
+                "compile_job_id": c_id,
+                "link_job_id": l_id,
+                "embed_job_id": e_id,
+                "primary_job_id": primary_job_id,
+                "api_used": "submit_compile_and_link_jobs",
+            }
+            return target_model, job_telemetry
+        except Exception as e:
+            print(f"  submit_compile_and_link_jobs notice: {e}. Falling back to submit_compile_job...")
+
+    # Legacy submit_compile_job fallback
+    print("  Submitting via submit_compile_job (legacy)...")
+    compile_job = qai_hub.submit_compile_job(
+        model=str(model_path),
+        device=device,
+        name=name,
+        options="--target_runtime precompiled_qnn_onnx",
+    )
+    c_id = compile_job.job_id
+    print(f"  Job Submitted! ID: {c_id}")
+    print(f"  Job URL: https://aihub.qualcomm.com/jobs/{c_id}")
+    target_model = compile_job.get_target_model()
+    return target_model, {
+        "compile_job_id": c_id,
+        "link_job_id": "none",
+        "embed_job_id": "none",
+        "primary_job_id": c_id,
+        "api_used": "submit_compile_job",
+    }
+
+
 def run_phase3_evaluation(
     device_name: str | None = None,
     compare_unquantized: bool = True,
     output_md: str = "npu_profiling_results.md",
+    force_legacy_compile: bool = False,
 ) -> dict[str, Any]:
     """Runs the complete Phase 3 AI Hub compilation, profiling, and inference verification workflow."""
     import qai_hub
@@ -117,25 +219,20 @@ def run_phase3_evaluation(
     print(f"  Target Device Selected: {device_str}")
     print("  Target Architecture:    Snapdragon X-class (Hexagon NPU)")
 
-    # 2. Compile Job (QNN Context Binary)
+    # 2. Compile Job (QNN Context Binary via submit_compile_and_link_jobs)
     quant_model_path = resolve_model_path("detector_quantized.onnx")
-    print(f"\n[2/5] Submitting compile job for '{Path(quant_model_path).name}'...")
-    print("  Target Backend: QNN (Hexagon NPU context binary)")
+    print(f"\n[2/5] Submitting compile & link job for '{Path(quant_model_path).name}'...")
+    print("  Target Backend: QNN (Hexagon NPU context binary embedded in ONNX)")
 
     compile_start = time.perf_counter()
-    compile_job = qai_hub.submit_compile_job(
-        model=str(quant_model_path),
+    compiled_model, quant_compile_meta = compile_model_qnn(
+        model_path=str(quant_model_path),
         device=device,
         name="Screen_PII_Detector_INT8_QNN",
-        options="--target_runtime precompiled_qnn_onnx",
+        force_legacy=force_legacy_compile,
     )
-    print(f"  Job Submitted! ID: {compile_job.job_id}")
-    print(f"  Job URL: https://aihub.qualcomm.com/jobs/{compile_job.job_id}")
-    print("  Waiting for QNN compilation to complete on remote device farm...")
-
-    compiled_model = compile_job.get_target_model()
     compile_time_s = time.perf_counter() - compile_start
-    print(f"  [OK] Compilation succeeded in {compile_time_s:.1f}s!")
+    print(f"  [OK] Compilation & linking succeeded in {compile_time_s:.1f}s!")
 
     # 3. Profiling Job (On-Device NPU Execution)
     print(f"\n[3/5] Submitting profiling job on {device_str}...")
@@ -220,13 +317,12 @@ def run_phase3_evaluation(
         clean_fp32_path = resolve_model_path("models/detector_clean_static.onnx")
         if os.path.exists(clean_fp32_path):
             print("\n[5/5] Compiling and profiling unquantized baseline ('detector_clean_static.onnx')...")
-            fp32_compile_job = qai_hub.submit_compile_job(
-                model=str(clean_fp32_path),
+            fp32_compiled, fp32_compile_meta = compile_model_qnn(
+                model_path=str(clean_fp32_path),
                 device=device,
                 name="Screen_PII_Detector_FP32_Baseline",
-                options="--target_runtime precompiled_qnn_onnx",
+                force_legacy=force_legacy_compile,
             )
-            fp32_compiled = fp32_compile_job.get_target_model()
             fp32_profile_job = qai_hub.submit_profile_job(
                 model=fp32_compiled,
                 device=device,
@@ -246,8 +342,9 @@ def run_phase3_evaluation(
                 "fp32_peak_mem_mb": fp32_mem_mb,
                 "speedup_factor": speedup,
                 "size_reduction_pct": size_reduction,
-                "compile_job_id": fp32_compile_job.job_id,
+                "compile_job_id": fp32_compile_meta["primary_job_id"],
                 "profile_job_id": fp32_profile_job.job_id,
+                "compile_meta": fp32_compile_meta,
             }
             print(f"  FP32 Baseline Latency: {fp32_latency_ms:.2f} ms")
             print(f"  INT8 Quantized Latency: {inference_ms:.2f} ms")
@@ -259,7 +356,7 @@ def run_phase3_evaluation(
     generate_markdown_report(
         output_path=report_path,
         device_str=device_str,
-        compile_job_id=compile_job.job_id,
+        compile_job_id=quant_compile_meta["primary_job_id"],
         profile_job_id=profile_job.job_id,
         inference_job_id=inference_job.job_id,
         latency_ms=inference_ms,
@@ -271,6 +368,7 @@ def run_phase3_evaluation(
         max_drift=max_drift,
         correlation=correlation,
         unquant_results=unquant_results,
+        compile_meta=quant_compile_meta,
     )
 
     print("\n" + "=" * 65)
@@ -286,6 +384,7 @@ def run_phase3_evaluation(
         "peak_memory_mb": peak_memory_mb,
         "mae_drift": mae_drift,
         "unquant_results": unquant_results,
+        "compile_meta": quant_compile_meta,
     }
 
 
@@ -304,8 +403,26 @@ def generate_markdown_report(
     max_drift: float,
     correlation: float,
     unquant_results: dict[str, Any] | None = None,
+    compile_meta: dict[str, Any] | None = None,
 ) -> None:
     """Writes the comprehensive Phase 3 on-device validation report."""
+    if compile_meta and compile_meta.get("api_used") == "submit_compile_and_link_jobs":
+        comp_id = compile_meta.get("compile_job_id", compile_job_id)
+        link_id = compile_meta.get("link_job_id", "none")
+        embed_id = compile_meta.get("embed_job_id", compile_job_id)
+        compilation_block = f"""1. **Compilation & Linking Pipeline (Modern AI Hub API):**
+   - **Compile Job ID (QNN DLC):** `{comp_id}`
+   - **Link Job ID (Context Binary):** `{link_id}`
+   - **Embed Job ID (ONNX Asset):** `{embed_id}`
+   - **Compilation Method:** `submit_compile_and_link_jobs(..., embed_in_onnx=True)`
+   - **Dashboard URL:** [https://aihub.qualcomm.com/jobs/{compile_job_id}](https://aihub.qualcomm.com/jobs/{compile_job_id})
+   - **Target Runtime:** `qnn_context_binary (embedded in ONNX)`"""
+    else:
+        compilation_block = f"""1. **Compilation Job (QNN Context Binary):**
+   - **Job ID:** `{compile_job_id}`
+   - **Dashboard URL:** [https://aihub.qualcomm.com/jobs/{compile_job_id}](https://aihub.qualcomm.com/jobs/{compile_job_id})
+   - **Target Runtime:** `qnn_context_binary`"""
+
     content = f"""# Phase 3 Benchmark & NPU Profiling Report
 **Project:** Screen PII Redactor (Snapdragon AI Lab Challenge)
 **Evaluation Target:** `detector_quantized.onnx` compiled for Qualcomm Neural Network (QNN)
@@ -345,10 +462,7 @@ This report establishes verifiable, on-device hardware performance for the Scree
 
 All jobs were executed on Qualcomm AI Hub's physical device farm and are independently auditable via Qualcomm AI Hub job IDs:
 
-1. **Compilation Job (QNN Context Binary):**
-   - **Job ID:** `{compile_job_id}`
-   - **Dashboard URL:** [https://aihub.qualcomm.com/jobs/{compile_job_id}](https://aihub.qualcomm.com/jobs/{compile_job_id})
-   - **Target Runtime:** `qnn_context_binary`
+{compilation_block}
 
 2. **Profiling Job (Hexagon NPU Telemetry):**
    - **Job ID:** `{profile_job_id}`
@@ -410,6 +524,12 @@ def main() -> None:
         help="Output markdown report path (default: npu_profiling_results.md)",
     )
 
+    parser.add_argument(
+        "--legacy-compile",
+        action="store_true",
+        help="Force legacy submit_compile_job instead of modern submit_compile_and_link_jobs",
+    )
+
     args = parser.parse_args()
 
     # Verify authentication
@@ -428,6 +548,7 @@ def main() -> None:
         device_name=args.device,
         compare_unquantized=not args.skip_unquantized,
         output_md=args.output,
+        force_legacy_compile=args.legacy_compile,
     )
 
 

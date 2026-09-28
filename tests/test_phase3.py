@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import onnx
-import pytest
 
 from evaluate_phase3 import (
     check_ai_hub_auth,
+    compile_model_qnn,
     generate_markdown_report,
     prepare_sample_input,
 )
@@ -99,6 +100,41 @@ class TestPhase3ReportGeneration:
         assert "j_comp_12345" in content
         assert "3.23x speedup on Hexagon NPU" in content
 
+    def test_generate_markdown_report_with_compile_meta(self, tmp_path: Path) -> None:
+        out_file = str(tmp_path / "test_modern_report.md")
+        compile_meta = {
+            "compile_job_id": "j_dlc_001",
+            "link_job_id": "j_link_002",
+            "embed_job_id": "j_embed_003",
+            "primary_job_id": "j_embed_003",
+            "api_used": "submit_compile_and_link_jobs",
+        }
+        generate_markdown_report(
+            output_path=out_file,
+            device_str="Snapdragon X Elite CRD",
+            compile_job_id="j_embed_003",
+            profile_job_id="j_prof_12345",
+            inference_job_id="j_infer_12345",
+            latency_ms=15.96,
+            p95_latency_ms=16.27,
+            npu_cycles_pct=100.0,
+            cpu_cycles_pct=0.0,
+            peak_memory_mb=36.90,
+            mae_drift=0.0023,
+            max_drift=0.012,
+            correlation=0.9745,
+            compile_meta=compile_meta,
+        )
+        assert os.path.exists(out_file)
+        with open(out_file, encoding="utf-8") as f:
+            content = f.read()
+
+        assert "submit_compile_and_link_jobs" in content
+        assert "j_dlc_001" in content
+        assert "j_link_002" in content
+        assert "j_embed_003" in content
+        assert "qnn_context_binary (embedded in ONNX)" in content
+
 
 class TestPhase3AuthCheck:
     """Tests authentication verification behavior."""
@@ -106,3 +142,76 @@ class TestPhase3AuthCheck:
     def test_check_ai_hub_auth_returns_boolean(self) -> None:
         result = check_ai_hub_auth()
         assert isinstance(result, bool)
+
+
+class TestPhase3CompileWorkflow:
+    """Tests the modern submit_compile_and_link_jobs workflow with fallback support."""
+
+    def test_compile_model_qnn_modern_api(self) -> None:
+        mock_model = MagicMock()
+        mock_cjob = MagicMock(job_id="comp_123")
+        mock_ljob = MagicMock(job_id="link_456")
+        mock_ejob = MagicMock(job_id="embed_789")
+        mock_ejob.get_target_model.return_value = mock_model
+
+        with patch("qai_hub.submit_compile_and_link_jobs") as mock_submit:
+            mock_submit.return_value = ([mock_cjob], mock_ljob, mock_ejob)
+
+            target_model, telemetry = compile_model_qnn(
+                model_path="detector_quantized.onnx",
+                device=MagicMock(),
+                name="test_compile",
+            )
+
+            assert target_model == mock_model
+            assert telemetry["api_used"] == "submit_compile_and_link_jobs"
+            assert telemetry["compile_job_id"] == "comp_123"
+            assert telemetry["link_job_id"] == "link_456"
+            assert telemetry["embed_job_id"] == "embed_789"
+            assert telemetry["primary_job_id"] == "embed_789"
+
+            mock_submit.assert_called_once()
+            _, kwargs = mock_submit.call_args
+            assert kwargs.get("embed_in_onnx") is True
+
+    def test_compile_model_qnn_fallback_on_exception(self) -> None:
+        mock_model = MagicMock()
+        mock_legacy_job = MagicMock(job_id="legacy_123")
+        mock_legacy_job.get_target_model.return_value = mock_model
+
+        with (
+            patch(
+                "qai_hub.submit_compile_and_link_jobs",
+                side_effect=RuntimeError("API not supported on server"),
+            ),
+            patch("qai_hub.submit_compile_job", return_value=mock_legacy_job) as mock_legacy,
+        ):
+            target_model, telemetry = compile_model_qnn(
+                model_path="detector_quantized.onnx",
+                device=MagicMock(),
+                name="test_compile",
+            )
+
+            assert target_model == mock_model
+            assert telemetry["api_used"] == "submit_compile_job"
+            assert telemetry["compile_job_id"] == "legacy_123"
+            assert telemetry["primary_job_id"] == "legacy_123"
+            mock_legacy.assert_called_once()
+
+    def test_compile_model_qnn_force_legacy(self) -> None:
+        mock_model = MagicMock()
+        mock_legacy_job = MagicMock(job_id="forced_legacy_456")
+        mock_legacy_job.get_target_model.return_value = mock_model
+
+        with patch("qai_hub.submit_compile_job", return_value=mock_legacy_job) as mock_legacy:
+            target_model, telemetry = compile_model_qnn(
+                model_path="detector_quantized.onnx",
+                device=MagicMock(),
+                name="test_compile",
+                force_legacy=True,
+            )
+
+            assert target_model == mock_model
+            assert telemetry["api_used"] == "submit_compile_job"
+            assert telemetry["compile_job_id"] == "forced_legacy_456"
+            mock_legacy.assert_called_once()
