@@ -21,6 +21,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+# Reconfigure stdout/stderr to UTF-8 on Windows to safely handle Qualcomm SDK status glyphs
+if sys.stdout is not None and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stderr is not None and hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 import cv2
 import numpy as np
 
@@ -96,6 +102,53 @@ def prepare_sample_input(image_path: str) -> np.ndarray:
     tensor = np.transpose(norm_img, (2, 0, 1))
     tensor = np.expand_dims(tensor, axis=0)
     return tensor.astype(np.float32)
+
+
+def extract_profile_metrics(profile_data: dict[str, Any]) -> dict[str, float]:
+    """Extracts cycle-accurate latency, memory footprint, and compute unit breakdown from AI Hub profile data."""
+    execution_summary = profile_data.get("execution_summary", {})
+    all_times = execution_summary.get("all_inference_times", [])
+
+    if all_times:
+        inference_ms = float(np.median(all_times) / 1000.0)
+        p95_inference_ms = float(np.percentile(all_times, 95) / 1000.0)
+    else:
+        est_time = execution_summary.get("estimated_inference_time", 0.0)
+        if isinstance(est_time, dict):
+            inference_ms = float(est_time.get("median", 0.0) / 1000.0)
+            p95_inference_ms = float(est_time.get("p95", 0.0) / 1000.0)
+        else:
+            inference_ms = float(est_time / 1000.0)
+            p95_inference_ms = inference_ms
+
+    execution_detail = profile_data.get("execution_detail", [])
+    if execution_detail:
+        total_layers = len(execution_detail)
+        npu_layers = sum(1 for layer in execution_detail if layer.get("compute_unit") == "NPU")
+        cpu_layers = sum(1 for layer in execution_detail if layer.get("compute_unit") == "CPU")
+        gpu_layers = sum(1 for layer in execution_detail if layer.get("compute_unit") == "GPU")
+        npu_cycles_pct = float((npu_layers / total_layers) * 100.0) if total_layers > 0 else 100.0
+        cpu_cycles_pct = float((cpu_layers / total_layers) * 100.0) if total_layers > 0 else 0.0
+        gpu_cycles_pct = float((gpu_layers / total_layers) * 100.0) if total_layers > 0 else 0.0
+    else:
+        compute_units = profile_data.get("compute_units", {})
+        npu_cycles_pct = float(compute_units.get("npu", 100.0))
+        cpu_cycles_pct = float(compute_units.get("cpu", 0.0))
+        gpu_cycles_pct = float(compute_units.get("gpu", 0.0))
+
+    peak_bytes = execution_summary.get("estimated_inference_peak_memory")
+    if peak_bytes is None or peak_bytes == 0:
+        peak_bytes = profile_data.get("memory_metrics", {}).get("peak_memory_bytes", 0)
+    peak_memory_mb = float(peak_bytes / (1024 * 1024))
+
+    return {
+        "inference_ms": inference_ms,
+        "p95_inference_ms": p95_inference_ms,
+        "npu_cycles_pct": npu_cycles_pct,
+        "cpu_cycles_pct": cpu_cycles_pct,
+        "gpu_cycles_pct": gpu_cycles_pct,
+        "peak_memory_mb": peak_memory_mb,
+    }
 
 
 def compile_model_qnn(
@@ -251,20 +304,13 @@ def run_phase3_evaluation(
     print(f"  [OK] Profiling completed in {profile_time_s:.1f}s!")
 
     # Extract profiling metrics
-    execution_summary = profile_data.get("execution_summary", {})
-    estimated_inference_time = execution_summary.get("estimated_inference_time", {})
-    inference_ms = float(estimated_inference_time.get("median", 0.0) / 1000.0)  # convert us to ms
-    p95_inference_ms = float(estimated_inference_time.get("p95", 0.0) / 1000.0)
-
-    # Compute unit breakdown
-    compute_units = profile_data.get("compute_units", {})
-    npu_cycles_pct = float(compute_units.get("npu", 100.0))
-    cpu_cycles_pct = float(compute_units.get("cpu", 0.0))
-    gpu_cycles_pct = float(compute_units.get("gpu", 0.0))
-
-    # Memory metrics
-    memory_metrics = profile_data.get("memory_metrics", {})
-    peak_memory_mb = float(memory_metrics.get("peak_memory_bytes", 0) / (1024 * 1024))
+    metrics = extract_profile_metrics(profile_data)
+    inference_ms = metrics["inference_ms"]
+    p95_inference_ms = metrics["p95_inference_ms"]
+    npu_cycles_pct = metrics["npu_cycles_pct"]
+    cpu_cycles_pct = metrics["cpu_cycles_pct"]
+    gpu_cycles_pct = metrics["gpu_cycles_pct"]
+    peak_memory_mb = metrics["peak_memory_mb"]
 
     print(f"  On-Device Latency:     {inference_ms:.2f} ms (P95: {p95_inference_ms:.2f} ms)")
     print(
@@ -329,9 +375,9 @@ def run_phase3_evaluation(
                 name="Screen_PII_Detector_FP32_Profile",
             )
             fp32_profile_data = fp32_profile_job.download_profile()
-            fp32_exec = fp32_profile_data.get("execution_summary", {}).get("estimated_inference_time", {})
-            fp32_latency_ms = float(fp32_exec.get("median", 0.0) / 1000.0)
-            fp32_mem_mb = float(fp32_profile_data.get("memory_metrics", {}).get("peak_memory_bytes", 0) / (1024 * 1024))
+            fp32_metrics = extract_profile_metrics(fp32_profile_data)
+            fp32_latency_ms = fp32_metrics["inference_ms"]
+            fp32_mem_mb = fp32_metrics["peak_memory_mb"]
 
             speedup = fp32_latency_ms / inference_ms if inference_ms > 0 else 1.0
             size_reduction = (4.54 - 1.27) / 4.54 * 100.0

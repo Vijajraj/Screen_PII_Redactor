@@ -371,15 +371,15 @@ Every number in this section is backed by an auditable execution on Qualcomm AI 
 
 | Pipeline Stage | Model Format | Qualcomm AI Hub Job ID | Dashboard Verification URL |
 |---|---|---|---|
-| **Compilation** | INT8 QNN Context | `jpyoy9mr5` | [aihub.qualcomm.com/jobs/jpyoy9mr5/](https://workbench.aihub.qualcomm.com/jobs/jpyoy9mr5/) |
-| **Profiling** | INT8 QNN Context | `j5qldjv7p` | [aihub.qualcomm.com/jobs/j5qldjv7p/](https://workbench.aihub.qualcomm.com/jobs/j5qldjv7p/) |
-| **Inference Verification** | INT8 QNN Context | `j5680kwvg` | [aihub.qualcomm.com/jobs/j5680kwvg/](https://workbench.aihub.qualcomm.com/jobs/j5680kwvg/) |
+| **Compilation & Linking** | INT8 QNN Context | `jp0m8odeg` | [aihub.qualcomm.com/jobs/jp0m8odeg/](https://workbench.aihub.qualcomm.com/jobs/jp0m8odeg/) |
+| **Profiling** | INT8 QNN Context | `jp8edj68p` | [aihub.qualcomm.com/jobs/jp8edj68p/](https://workbench.aihub.qualcomm.com/jobs/jp8edj68p/) |
+| **Inference Verification** | INT8 QNN Context | `jpvly2dj5` | [aihub.qualcomm.com/jobs/jpvly2dj5/](https://workbench.aihub.qualcomm.com/jobs/jpvly2dj5/) |
 | **FP32 Compilation** | FP32 Precompiled | `jgol9j84g` | [aihub.qualcomm.com/jobs/jgol9j84g/](https://workbench.aihub.qualcomm.com/jobs/jgol9j84g/) |
 | **FP32 Profiling** | FP32 Precompiled | `jgjr8jq7p` | [aihub.qualcomm.com/jobs/jgjr8jq7p/](https://workbench.aihub.qualcomm.com/jobs/jgjr8jq7p/) |
 
 ### Proposal Citation Statement
 
-> *"Pipeline logic built and validated locally (Phase 1); live capture and redaction demonstrated on local device via CPU execution provider (Phase 2); on-device NPU performance and correctness validated via Qualcomm AI Hub's cloud device profiling on Snapdragon X Elite CRD (Phase 3), achieving 15.96 ms inference latency with 100.0% native Hexagon NPU utilization, 0% CPU fallback, and 0.0023 MAE numerical output fidelity."*
+> *"Pipeline logic built and validated locally (Phase 1); live capture and redaction demonstrated on local device via CPU execution provider (Phase 2); on-device NPU performance and correctness validated via Qualcomm AI Hub's cloud device profiling on Snapdragon X Elite CRD (Phase 3), achieving 16.05 ms inference latency with 100.0% native Hexagon NPU utilization, 0% CPU fallback, and 0.0023 MAE numerical output fidelity."*
 
 ---
 

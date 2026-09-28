@@ -15,6 +15,7 @@ import onnx
 from evaluate_phase3 import (
     check_ai_hub_auth,
     compile_model_qnn,
+    extract_profile_metrics,
     generate_markdown_report,
     prepare_sample_input,
 )
@@ -215,3 +216,55 @@ class TestPhase3CompileWorkflow:
             assert telemetry["api_used"] == "submit_compile_job"
             assert telemetry["compile_job_id"] == "forced_legacy_456"
             mock_legacy.assert_called_once()
+
+
+class TestPhase3MetricExtraction:
+    """Tests metric extraction from various Qualcomm AI Hub profile payload structures."""
+
+    def test_extract_with_all_inference_times_and_execution_detail(self) -> None:
+        profile_data = {
+            "execution_summary": {
+                "all_inference_times": [16000, 16100, 15900, 16200, 15800],
+                "estimated_inference_time": 15800,
+                "estimated_inference_peak_memory": 38809600,
+            },
+            "execution_detail": [
+                {"name": "conv1", "compute_unit": "NPU"},
+                {"name": "conv2", "compute_unit": "NPU"},
+                {"name": "conv3", "compute_unit": "NPU"},
+            ],
+        }
+        metrics = extract_profile_metrics(profile_data)
+        assert metrics["inference_ms"] == 16.0
+        assert metrics["npu_cycles_pct"] == 100.0
+        assert metrics["cpu_cycles_pct"] == 0.0
+        assert round(metrics["peak_memory_mb"], 2) == 37.01
+
+    def test_extract_with_int_estimated_inference_time(self) -> None:
+        profile_data = {
+            "execution_summary": {
+                "estimated_inference_time": 15838,
+            },
+            "compute_units": {"npu": 100.0, "cpu": 0.0, "gpu": 0.0},
+            "memory_metrics": {"peak_memory_bytes": 38809600},
+        }
+        metrics = extract_profile_metrics(profile_data)
+        assert round(metrics["inference_ms"], 2) == 15.84
+        assert metrics["npu_cycles_pct"] == 100.0
+        assert metrics["cpu_cycles_pct"] == 0.0
+        assert round(metrics["peak_memory_mb"], 2) == 37.01
+
+    def test_extract_with_dict_estimated_inference_time(self) -> None:
+        profile_data = {
+            "execution_summary": {
+                "estimated_inference_time": {"median": 16000, "p95": 16500},
+            },
+            "compute_units": {"npu": 98.5, "cpu": 1.5, "gpu": 0.0},
+            "memory_metrics": {"peak_memory_bytes": 31457280},
+        }
+        metrics = extract_profile_metrics(profile_data)
+        assert metrics["inference_ms"] == 16.0
+        assert metrics["p95_inference_ms"] == 16.5
+        assert metrics["npu_cycles_pct"] == 98.5
+        assert metrics["cpu_cycles_pct"] == 1.5
+        assert metrics["peak_memory_mb"] == 30.0
