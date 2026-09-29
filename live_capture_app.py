@@ -482,7 +482,12 @@ class LivePIIRedactorApp:
             if self.capture_source:
                 self.capture_source.close()
 
-    def run_live_monitor(self, max_frames: int | None = None, backend: str = "auto") -> None:
+    def run_live_monitor(
+        self,
+        max_frames: int | None = None,
+        backend: str = "auto",
+        auto_demo: bool = False,
+    ) -> None:
         """
         Runs the live screen capture monitor with resilient multi-backend display support:
           1. OpenCV HighGUI window (fast native C++ window)
@@ -515,7 +520,7 @@ class LivePIIRedactorApp:
         # 3. Try Native Tkinter Window (if backend is auto or tkinter)
         if backend in ("auto", "tkinter"):
             try:
-                viewer = TkinterLiveViewer(self, max_frames=max_frames)
+                viewer = TkinterLiveViewer(self, max_frames=max_frames, auto_demo=auto_demo)
                 viewer.run()
                 return
             except Exception as tk_err:
@@ -534,10 +539,21 @@ class TkinterLiveViewer:
       - 'q' or Escape: quit
       - 's': save snapshot
       - 'p': pause/resume
+      - 'd': open sample test KYC document
+      - 'm': toggle desktop mirror mode
+      - 'r': select region
+      - 't': toggle always-on-top
     """
 
-    def __init__(self, app: LivePIIRedactorApp, max_frames: int | None = None) -> None:
+    def __init__(
+        self,
+        app: LivePIIRedactorApp,
+        max_frames: int | None = None,
+        auto_demo: bool = False,
+    ) -> None:
         self.app = app
+        self.max_frames = max_frames
+        self.auto_demo = auto_demo
         self.max_frames = max_frames
         self.frame_count = 0
         self.paused = False
@@ -571,6 +587,9 @@ class TkinterLiveViewer:
         except Exception:
             pass
 
+        self.mirror_mode = False
+        self._test_doc_window: Any = None
+
         # Setup key bindings
         self.root.bind("<Key-q>", lambda e: self.on_quit())
         self.root.bind("<Key-Q>", lambda e: self.on_quit())
@@ -581,13 +600,17 @@ class TkinterLiveViewer:
         self.root.bind("<Key-S>", lambda e: self.save_snapshot())
         self.root.bind("<Key-r>", lambda e: self.prompt_region_select())
         self.root.bind("<Key-R>", lambda e: self.prompt_region_select())
+        self.root.bind("<Key-d>", lambda e: self.open_test_document())
+        self.root.bind("<Key-D>", lambda e: self.open_test_document())
+        self.root.bind("<Key-m>", lambda e: self.toggle_mirror_mode())
+        self.root.bind("<Key-M>", lambda e: self.toggle_mirror_mode())
         self.root.bind("<Key-t>", lambda e: self._toggle_topmost())
         self.root.bind("<Key-T>", lambda e: self._toggle_topmost())
         self.root.protocol("WM_DELETE_WINDOW", self.on_quit)
 
         # Bottom status bar (packed first so it never gets clipped)
         self.status_var = tk.StringVar(
-            value="[R]egion  [P]ause  [S]nap  [T]opmost  [Q]uit"
+            value="[D] Test Card  [R]egion  [M]irror  [T]opmost  [Q]uit"
         )
         self.status_label = tk.Label(
             self.root,
@@ -608,6 +631,8 @@ class TkinterLiveViewer:
     def on_quit(self) -> None:
         self.running = False
         with contextlib.suppress(Exception):
+            if self._test_doc_window and self._test_doc_window.winfo_exists():
+                self._test_doc_window.destroy()
             self.root.destroy()
         if self.app.capture_source:
             self.app.capture_source.close()
@@ -619,9 +644,95 @@ class TkinterLiveViewer:
             self.status_label.configure(fg="#ffab00")
             print("Paused")
         else:
-            self.status_var.set("[Q]uit [P]ause [S]nap [R]egion [T]opmost")
+            self.status_var.set("[D] Test Card  [R]egion  [M]irror  [T]opmost  [Q]uit")
             self.status_label.configure(fg="#00e676")
             print("Resumed")
+
+    def toggle_mirror_mode(self) -> None:
+        """Toggle continuous desktop mirror vs smart redaction-only view."""
+        self.mirror_mode = not self.mirror_mode
+        state = "ON (Full Mirror)" if self.mirror_mode else "OFF (Smart Redact-Only)"
+        self.status_var.set(f"Mirror Mode: {state}")
+        print(f"Mirror Mode: {state}")
+
+    def open_test_document(self) -> None:
+        """Opens a sample test document containing realistic Indian PII for instant verification."""
+        try:
+            if self._test_doc_window and self._test_doc_window.winfo_exists():
+                self._test_doc_window.lift()
+                return
+
+            top = self.tk.Toplevel(self.root)
+            self._test_doc_window = top
+            top.title("Test KYC Document — Indian PII Sample")
+            top.geometry("460x340+40+60")
+            top.configure(bg="#ffffff")
+            top.attributes("-topmost", True)
+
+            header = self.tk.Label(
+                top,
+                text="CUSTOMER KYC REGISTRATION (TEST DATA)",
+                font=("Segoe UI", 11, "bold"),
+                bg="#1a237e",
+                fg="#ffffff",
+                pady=6,
+            )
+            header.pack(fill=self.tk.X)
+
+            body = self.tk.Text(
+                top,
+                font=("Consolas", 10),
+                bg="#f8f9fa",
+                fg="#1a1a1a",
+                padx=12,
+                pady=12,
+                relief=self.tk.FLAT,
+            )
+            body.pack(fill=self.tk.BOTH, expand=True)
+
+            sample_text = (
+                "Name:            Rajesh Kumar Sharma\n"
+                "----------------------------------------\n"
+                "Aadhaar Number:  9876 5432 1012\n"
+                "PAN Card:        ABCDE1234F\n"
+                "Credit Card:     4532 1957 3372 8189\n"
+                "UPI ID:          rajesh.kumar@okhdfcbank\n"
+                "Phone Number:    +91 9845123456\n"
+                "IFSC Code:       HDFC0001234\n"
+                "Email:           rajesh.sharma@example.com\n"
+                "----------------------------------------\n"
+                "[All identifiers pass Verhoeff & Luhn]"
+            )
+            body.insert(self.tk.END, sample_text)
+            body.configure(state=self.tk.DISABLED)
+            print("Opened test KYC document window on screen.")
+        except Exception as err:
+            print(f"Could not open test document: {err}")
+
+    def _render_standby_screen(self, width: int, height: int) -> np.ndarray:
+        """Renders an elegant status card when 0 PII is detected, avoiding infinite mirror recursion."""
+        canvas = np.zeros((height, width, 3), dtype=np.uint8)
+        canvas[:] = (22, 24, 30)
+
+        cv2.putText(canvas, "SCREEN PII REDACTOR", (16, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 230, 118), 2, cv2.LINE_AA)
+        cv2.putText(canvas, f"Engine: {self.app.active_provider} | Actively Scanning", (16, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (160, 165, 175), 1, cv2.LINE_AA)
+
+        # Card container
+        card_y1 = 58
+        card_y2 = max(card_y1 + 40, height - 32)
+        cv2.rectangle(canvas, (12, card_y1), (width - 12, card_y2), (32, 35, 44), -1)
+        cv2.rectangle(canvas, (12, card_y1), (width - 12, card_y2), (55, 60, 75), 1)
+
+        cv2.putText(canvas, "Status: Monitoring (0 PII on screen)", (22, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 230, 118), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "Watching for Indian PII:", (22, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (140, 145, 155), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "- Aadhaar (12-digit Verhoeff)", (22, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 205, 215), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "- PAN Card (e.g. ABCDE1234F)", (22, 138), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 205, 215), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "- Payment Cards (16-digit Luhn)", (22, 156), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 205, 215), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "- UPI IDs (user@okhdfcbank)", (22, 174), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 205, 215), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "- Phone (+91), IFSC, Email", (22, 192), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 205, 215), 1, cv2.LINE_AA)
+
+        cv2.putText(canvas, "Press [D] to open Test Card  |  [R] Region  |  [M] Mirror", (14, height - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.33, (0, 230, 118), 1, cv2.LINE_AA)
+        return canvas
 
     def _toggle_topmost(self) -> None:
         """Toggle always-on-top behavior."""
@@ -694,18 +805,22 @@ class TkinterLiveViewer:
             self.current_display_frame = display_frame
             self.frame_count += 1
 
-            if not self.paused:
-                self.status_var.set(
-                    f"[{self.app.active_provider}] {timings['total_ms']:.0f}ms | {len(findings)} PII | [R]egion [P]ause [S]nap [Q]uit"
-                )
-
-            # Dynamically adapt preview scale to current window dimensions (responsive to snap / resize)
             win_w = max(240, self.root.winfo_width())
             win_h = max(160, self.root.winfo_height() - 32)
-            disp_h, disp_w = display_frame.shape[:2]
-            scale = min(win_w / disp_w, win_h / disp_h)
-            new_w, new_h = max(1, int(disp_w * scale)), max(1, int(disp_h * scale))
-            render_img = cv2.resize(display_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+            if not self.paused:
+                self.status_var.set(
+                    f"[{self.app.active_provider}] {timings['total_ms']:.0f}ms | {len(findings)} PII | [D] Test  [R]egion  [M]irror  [Q]uit"
+                )
+
+            # Smart Display: If 0 PII on screen and not in explicit mirror mode, show standby card (prevents infinite mirror!)
+            if len(findings) == 0 and not self.mirror_mode and self.app.region is None:
+                render_img = self._render_standby_screen(win_w, win_h)
+            else:
+                disp_h, disp_w = display_frame.shape[:2]
+                scale = min(win_w / disp_w, win_h / disp_h)
+                new_w, new_h = max(1, int(disp_w * scale)), max(1, int(disp_h * scale))
+                render_img = cv2.resize(display_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
             rgb = cv2.cvtColor(render_img, cv2.COLOR_BGR2RGB)
             pil_img = self.Image.fromarray(rgb)
@@ -726,7 +841,9 @@ class TkinterLiveViewer:
 
     def run(self) -> None:
         print("\nStarting live capture loop (Native Tkinter Window).")
-        print("Controls in window: [q] or [Esc] to quit, [p] to pause/resume, [s] to save snapshot.\n")
+        print("Controls in window: [D] Test PII Card  |  [R] Select Region  |  [M] Mirror  |  [P] Pause  |  [Q] Quit\n")
+        if self.auto_demo:
+            self.root.after(300, self.open_test_document)
         self.root.after(10, self.step)
         try:
             self.root.mainloop()
@@ -951,6 +1068,11 @@ def main() -> None:
         help="Interactively click and drag to select screen region before starting",
     )
     parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Launch interactive test document popup alongside live redactor for immediate verification",
+    )
+    parser.add_argument(
         "--backend",
         choices=["auto", "opencv", "tkinter", "headless"],
         default="auto",
@@ -982,7 +1104,7 @@ def main() -> None:
         region_dict = {"left": left, "top": top, "width": width, "height": height}
 
     app = LivePIIRedactorApp(interval=args.interval, region=region_dict)
-    app.run_live_monitor(max_frames=args.frames, backend=args.backend)
+    app.run_live_monitor(max_frames=args.frames, backend=args.backend, auto_demo=args.demo)
 
 
 if __name__ == "__main__":
