@@ -1,9 +1,9 @@
 # Screen PII Redactor
 
 **On-Device Sensitive PII Detection & Redaction for Indian & Universal Identifiers**  
-*Snapdragon AI Lab Challenge — Phase 1: Model Build & Export (Local)*
+*Snapdragon AI Lab Challenge — Complete Implementation (Phases 1, 2 & 3)*
 
-[![Tests](https://img.shields.io/badge/tests-210%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-225%20passed-brightgreen.svg)]()
 [![Model](https://img.shields.io/badge/ONNX-Static%20640x640-blue.svg)]()
 [![Quantization](https://img.shields.io/badge/INT8-1.27%20MB%20(3.57x)-orange.svg)]()
 [![Phase 2](https://img.shields.io/badge/Phase%202-Live%20Capture%20%26%20Demo-success.svg)]()
@@ -383,7 +383,7 @@ Every number in this section is backed by an auditable execution on Qualcomm AI 
 
 ---
 
-## 12. Comprehensive Testing Suite & Quality Gates (218 Tests)
+## 12. Comprehensive Testing Suite & Quality Gates (225 Tests)
 
 A multi-tiered verification architecture guarantees numerical precision, checksum correctness, boundary invariants, and cross-platform reliability:
 
@@ -399,7 +399,7 @@ flowchart TD
     end
 
     subgraph G3["Gate 3: Unit & Property Tests"]
-        U1["Unit Tests (124 Tests)<br/>Verhoeff, Luhn, Classifier, Letterbox, Phase 3 Preconditions"]
+        U1["Unit Tests (131 Tests)<br/>Verhoeff, Luhn, Classifier, Letterbox, Phase 3 Preconditions, Modern QNN Workflow"]
         P1["Property-Based Tests (18 Tests)<br/>Hypothesis Invariant Generators"]
     end
 
@@ -420,12 +420,12 @@ flowchart TD
 
 | Category | Test Files | Tests | Key Focus Areas | Status |
 |---|---|:---:|---|:---:|
-| **Unit Testing** | `test_unit_verhoeff.py`<br>`test_unit_luhn.py`<br>`test_unit_classifier.py`<br>`test_pii_classifier.py`<br>`test_live_capture.py`<br>`test_phase3.py` | **124** | Verhoeff/Luhn checksums, single-digit corruptions, transpositions, all 7 PII categories, non-overlapping spans, letterbox scaling, Phase 3 QNN preconditions & report generation | **100% Pass** |
+| **Unit Testing** | `test_unit_verhoeff.py`<br>`test_unit_luhn.py`<br>`test_unit_classifier.py`<br>`test_pii_classifier.py`<br>`test_live_capture.py`<br>`test_phase3.py` | **131** | Verhoeff/Luhn checksums, single-digit corruptions, transpositions, all 7 PII categories, non-overlapping spans, letterbox scaling, Phase 3 QNN preconditions, modern `submit_compile_and_link_jobs` workflow & telemetry parsing | **100% Pass** |
 | **Integration Testing** | `test_integration.py`<br>`test_inference_wrapper.py` | **34** | DBNet bounding box crops to SVTR recognizer handoff, PIL/NumPy/path inputs, ground truth dataset consistency | **100% Pass** |
 | **System Testing** | `test_system.py`<br>`test_system_phase2.py` | **20** | `onnx.checker` model integrity, full pipeline round-trips on all 20 images, CLI subprocesses (`--help`, `--benchmark`), video/GIF stream integrity | **100% Pass** |
 | **Acceptance Testing** | `test_acceptance.py`<br>`test_acceptance_phase2.py` | **22** | Phase 1 Section 7 and Phase 2 Section 5 exit criteria: static shape `[1, 3, 640, 640]`, INT8 size < 2 MB, MAE drift < 0.01, recall > 90%, zero false positives, CPU EP fallback | **100% Pass** |
 | **Property-Based Testing** | `test_property.py`<br>`test_property_phase2.py` | **18** | Hypothesis algorithmic invariants: Verhoeff/Luhn round-trips, arbitrary dimension letterboxing, boundary coordinate clamping, random negative garbage resistance | **100% Pass** |
-| **TOTAL** | **12 Test Suites** | **218** | **All Verification Dimensions** | **100% Pass** |
+| **TOTAL** | **12 Test Suites** | **225** | **All Verification Dimensions** | **100% Pass** |
 
 ---
 
@@ -439,9 +439,12 @@ cd Screen_PII_Redactor
 pip install -r requirements.txt
 ```
 
-### 2. Launch Live Screen PII Redactor
+### 2. Launch Live Screen PII Redactor (Local Host)
 ```bash
-# Launch interactive live screen monitor (auto-detects OpenCV or Tkinter GUI)
+# Option A: Universal Windows batch launcher (works from any working directory)
+.\run_redactor.bat --interval 0.5
+
+# Option B: Direct Python invocation (auto-detects OpenCV or Tkinter GUI)
 python live_capture_app.py --interval 0.5
 
 # Works seamlessly from ANY directory or command prompt
@@ -477,7 +480,7 @@ python evaluate_phase3.py
 # Generates npu_profiling_results.md with auditable cloud device metrics
 ```
 
-### 6. Run Full 218-Test Automated Verification Suite
+### 6. Run Full 225-Test Automated Verification Suite
 ```bash
 python -m pytest tests -v
 ```
