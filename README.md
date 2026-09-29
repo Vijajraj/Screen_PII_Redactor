@@ -359,10 +359,10 @@ Real on-device comparison between unquantized FP32 (`models/detector_clean_stati
 | Evaluation Dimension | FP32 Unquantized Baseline | INT8 Quantized Model | Hardware Benefit |
 |---|---|---|:---:|
 | **Model Size** | 4.54 MB | 1.27 MB | **72.0% storage reduction (3.57x compression)** |
-| **On-Device Latency** | 6.26 ms | 15.96 ms | Sub-16ms latency across both formats |
-| **Local CPU vs NPU Speedup** | 463.2 ms (CPU) | 15.96 ms (NPU) | **29.0x speedup on Snapdragon NPU** |
+| **On-Device Latency** | 6.21 ms | 16.05 ms | Sub-17ms latency across both formats |
+| **Local CPU vs NPU Speedup** | 463.2 ms (CPU) | 16.05 ms (NPU) | **28.9x speedup on Snapdragon NPU** |
 | **NPU Layer Execution** | 100.0% (201/201 layers) | 100.0% (506/506 layers) | Zero CPU fallback across both graphs |
-| **Peak Device Memory** | 36.85 MB | 36.90 MB | Optimized memory footprint |
+| **Peak Device Memory** | 37.10 MB | 37.01 MB | Optimized memory footprint |
 | **Working Inference RAM** | 5.10 MB | 4.54 MB | 11.0% working RAM reduction |
 
 ### Auditable Qualcomm AI Hub Job Telemetry
@@ -374,8 +374,8 @@ Every number in this section is backed by an auditable execution on Qualcomm AI 
 | **Compilation & Linking** | INT8 QNN Context | `jp0m8odeg` | [aihub.qualcomm.com/jobs/jp0m8odeg/](https://workbench.aihub.qualcomm.com/jobs/jp0m8odeg/) |
 | **Profiling** | INT8 QNN Context | `jp8edj68p` | [aihub.qualcomm.com/jobs/jp8edj68p/](https://workbench.aihub.qualcomm.com/jobs/jp8edj68p/) |
 | **Inference Verification** | INT8 QNN Context | `jpvly2dj5` | [aihub.qualcomm.com/jobs/jpvly2dj5/](https://workbench.aihub.qualcomm.com/jobs/jpvly2dj5/) |
-| **FP32 Compilation** | FP32 Precompiled | `jgol9j84g` | [aihub.qualcomm.com/jobs/jgol9j84g/](https://workbench.aihub.qualcomm.com/jobs/jgol9j84g/) |
-| **FP32 Profiling** | FP32 Precompiled | `jgjr8jq7p` | [aihub.qualcomm.com/jobs/jgjr8jq7p/](https://workbench.aihub.qualcomm.com/jobs/jgjr8jq7p/) |
+| **FP32 Compilation & Linking** | FP32 QNN Context | `jgolx2m1g` | [aihub.qualcomm.com/jobs/jgolx2m1g/](https://workbench.aihub.qualcomm.com/jobs/jgolx2m1g/) |
+| **FP32 Profiling** | FP32 QNN Context | `jpvl864z5` | [aihub.qualcomm.com/jobs/jpvl864z5/](https://workbench.aihub.qualcomm.com/jobs/jpvl864z5/) |
 
 ### Proposal Citation Statement
 

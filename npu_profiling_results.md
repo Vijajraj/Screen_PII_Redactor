@@ -58,15 +58,15 @@ All jobs were executed on Qualcomm AI Hub's physical device farm using the moder
 
 ## 4. Quantized vs. Unquantized On-Device Comparison
 
-Real hardware execution comparison between unquantized FP32 (`detector_clean_static.onnx`) and INT8 static quantized (`detector_quantized.onnx`):
+Real hardware execution comparison between unquantized FP32 (`detector_clean_static.onnx`) and INT8 static quantized (`detector_quantized.onnx`), both compiled via `submit_compile_and_link_jobs(..., embed_in_onnx=True)`:
 
 | Evaluation Dimension | FP32 Unquantized Baseline | INT8 Quantized Model | Hardware Benefit |
 |---|---|---|:---:|
 | **Model Size** | 4.54 MB | 1.27 MB | **72.0% storage reduction** |
-| **On-Device Latency** | 6.26 ms | 16.05 ms | **Sub-17ms latency across both formats** |
-| **Peak Device Memory** | 36.85 MB | 37.01 MB | **Memory footprint optimized** |
-| **FP32 Compile Job ID** | `jgol9j84g` | `jp0m8odeg` | Auditable |
-| **FP32 Profile Job ID** | `jgjr8jq7p` | `jp8edj68p` | Auditable |
+| **On-Device Latency** | 6.21 ms | 16.05 ms | **Sub-17ms latency across both formats** |
+| **Peak Device Memory** | 37.10 MB | 37.01 MB | **Memory footprint optimized** |
+| **FP32 Compile Job ID** | `jgolx2m1g` | `jp0m8odeg` | Auditable (Modern API) |
+| **FP32 Profile Job ID** | `jpvl864z5` | `jp8edj68p` | Auditable |
 
 ---
 
