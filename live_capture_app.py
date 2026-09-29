@@ -552,6 +552,18 @@ class TkinterLiveViewer:
         self.root.title(f"Screen PII Redactor [{self.app.active_provider}] — Native Display")
         self.root.configure(bg="#121212")
 
+        # Position window docked on the right side of screen by default to keep document workspace clear
+        try:
+            screen_w = self.root.winfo_screenwidth()
+            screen_h = self.root.winfo_screenheight()
+            init_w = min(760, max(480, screen_w // 2 - 40))
+            init_h = min(480, max(320, screen_h - 160))
+            init_x = max(0, screen_w - init_w - 20)
+            init_y = 40
+            self.root.geometry(f"{init_w}x{init_h}+{init_x}+{init_y}")
+        except Exception:
+            pass
+
         # Setup key bindings
         self.root.bind("<Key-q>", lambda e: self.on_quit())
         self.root.bind("<Key-Q>", lambda e: self.on_quit())
@@ -570,7 +582,7 @@ class TkinterLiveViewer:
 
         # Bottom status bar
         self.status_var = tk.StringVar(
-            value="[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause  |  [S] Snapshot  |  [R] Select Region"
+            value="[ACTIVE] [R] Select Region  |  [P] Pause  |  [S] Snapshot  |  [Q/Esc] Quit  |  Snap Win+Right to side"
         )
         self.status_label = tk.Label(
             self.root,
@@ -664,15 +676,13 @@ class TkinterLiveViewer:
             self.current_display_frame = display_frame
             self.frame_count += 1
 
-            # Downscale dynamically to fit comfortably within 1280x720 window if screen is large
+            # Dynamically adapt preview scale to current window dimensions (responsive to snap / resize)
+            win_w = max(320, self.root.winfo_width())
+            win_h = max(200, self.root.winfo_height() - 40)
             disp_h, disp_w = display_frame.shape[:2]
-            max_w, max_h = 1280, 720
-            if disp_w > max_w or disp_h > max_h:
-                scale = min(max_w / disp_w, max_h / disp_h)
-                new_w, new_h = max(1, int(disp_w * scale)), max(1, int(disp_h * scale))
-                render_img = cv2.resize(display_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
-            else:
-                render_img = display_frame
+            scale = min(win_w / disp_w, win_h / disp_h)
+            new_w, new_h = max(1, int(disp_w * scale)), max(1, int(disp_h * scale))
+            render_img = cv2.resize(display_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
             rgb = cv2.cvtColor(render_img, cv2.COLOR_BGR2RGB)
             pil_img = self.Image.fromarray(rgb)
