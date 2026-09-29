@@ -348,7 +348,10 @@ class LivePIIRedactorApp:
         """
         t0 = time.perf_counter()
 
-        # Step 0: Apply Self-Exclusion Mask (eliminates hall-of-mirrors recursion)
+        # Step 0: Prepare inference frame with self-exclusion
+        # (blanks the redactor window area ONLY for neural inference so it doesn't scan its own HUD,
+        # without painting ugly black boxes on the visible output)
+        infer_frame = frame_bgr
         if exclude_rect:
             ex, ey, ew, eh = exclude_rect
             h, w = frame_bgr.shape[:2]
@@ -357,23 +360,12 @@ class LivePIIRedactorApp:
             x2 = max(0, min(w, ex + ew))
             y2 = max(0, min(h, ey + eh))
             if x2 > x1 + 20 and y2 > y1 + 20:
-                frame_bgr = frame_bgr.copy()
-                frame_bgr[y1:y2, x1:x2] = (30, 32, 38)
-                cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), (65, 70, 80), 2)
-                cv2.putText(
-                    frame_bgr,
-                    "Redactor Window (Excluded from Scan)",
-                    (x1 + 15, min(y2 - 15, y1 + 35)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (160, 165, 175),
-                    1,
-                    cv2.LINE_AA,
-                )
+                infer_frame = frame_bgr.copy()
+                infer_frame[y1:y2, x1:x2] = (30, 32, 38)
 
         # Step 1: Preprocess (Letterbox)
         if self.use_letterbox:
-            boxed_img, meta = self.letterbox.transform(frame_bgr)
+            boxed_img, meta = self.letterbox.transform(infer_frame)
             t_pre = time.perf_counter()
 
             # Step 2: Run Phase 1 Pipeline on 640x640
@@ -393,11 +385,25 @@ class LivePIIRedactorApp:
                     mapped_pii.append(item)
         else:
             t_pre = time.perf_counter()
-            res = self.pipeline.run_on_image(frame_bgr)
+            res = self.pipeline.run_on_image(infer_frame)
             t_infer = time.perf_counter()
             mapped_pii = res["pii_findings"]
 
-        # Step 4: Redaction Rendering
+        # Filter out any detections whose bounding box center falls inside exclude_rect
+        if exclude_rect:
+            ex, ey, ew, eh = exclude_rect
+            filtered_pii = []
+            for item in mapped_pii:
+                bx = item.get("bbox")
+                if bx and len(bx) == 4:
+                    bcx = (bx[0] + bx[2]) / 2.0
+                    bcy = (bx[1] + bx[3]) / 2.0
+                    if ex <= bcx <= ex + ew and ey <= bcy <= ey + eh:
+                        continue
+                filtered_pii.append(item)
+            mapped_pii = filtered_pii
+
+        # Step 4: Redaction Rendering on clean frame (no black exclusion rectangle)
         redacted_frame = RedactionRenderer.apply_redactions(frame_bgr, mapped_pii)
         t_post = time.perf_counter()
 
@@ -549,18 +555,19 @@ class TkinterLiveViewer:
         self.ImageTk = ImageTk
 
         self.root = tk.Tk()
-        self.root.title(f"Screen PII Redactor [{self.app.active_provider}] — Native Display")
+        self.root.title(f"Screen PII Redactor [{self.app.active_provider}]")
         self.root.configure(bg="#121212")
 
-        # Position window docked on the right side of screen by default to keep document workspace clear
+        # Compact PIP (picture-in-picture) monitor docked to bottom-right corner, always on top
         try:
             screen_w = self.root.winfo_screenwidth()
             screen_h = self.root.winfo_screenheight()
-            init_w = min(760, max(480, screen_w // 2 - 40))
-            init_h = min(480, max(320, screen_h - 160))
-            init_x = max(0, screen_w - init_w - 20)
-            init_y = 40
+            init_w = 420
+            init_h = 280
+            init_x = max(0, screen_w - init_w - 12)
+            init_y = max(0, screen_h - init_h - 60)
             self.root.geometry(f"{init_w}x{init_h}+{init_x}+{init_y}")
+            self.root.attributes("-topmost", True)
         except Exception:
             pass
 
@@ -574,27 +581,29 @@ class TkinterLiveViewer:
         self.root.bind("<Key-S>", lambda e: self.save_snapshot())
         self.root.bind("<Key-r>", lambda e: self.prompt_region_select())
         self.root.bind("<Key-R>", lambda e: self.prompt_region_select())
+        self.root.bind("<Key-t>", lambda e: self._toggle_topmost())
+        self.root.bind("<Key-T>", lambda e: self._toggle_topmost())
         self.root.protocol("WM_DELETE_WINDOW", self.on_quit)
 
-        # Main image display container
-        self.image_label = tk.Label(self.root, bg="#121212")
-        self.image_label.pack(fill=tk.BOTH, expand=True)
-
-        # Bottom status bar
+        # Bottom status bar (packed first so it never gets clipped)
         self.status_var = tk.StringVar(
-            value="[ACTIVE] [R] Select Region  |  [P] Pause  |  [S] Snapshot  |  [Q/Esc] Quit  |  Snap Win+Right to side"
+            value="[R]egion  [P]ause  [S]nap  [T]opmost  [Q]uit"
         )
         self.status_label = tk.Label(
             self.root,
             textvariable=self.status_var,
             bg="#18181b",
             fg="#00e676",
-            font=("Consolas", 10, "bold"),
+            font=("Segoe UI", 8, "bold"),
             anchor="w",
-            padx=12,
-            pady=6,
+            padx=8,
+            pady=3,
         )
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Main image display container
+        self.image_label = tk.Label(self.root, bg="#121212")
+        self.image_label.pack(fill=tk.BOTH, expand=True)
 
     def on_quit(self) -> None:
         self.running = False
@@ -606,15 +615,24 @@ class TkinterLiveViewer:
     def toggle_pause(self) -> None:
         self.paused = not self.paused
         if self.paused:
-            self.status_var.set("[PAUSED] Live Redactor paused. Controls: [P] Resume  |  [Q/Esc] Quit  |  [S] Snapshot")
+            self.status_var.set("[PAUSED] [P] Resume  [Q] Quit  [S] Snap")
             self.status_label.configure(fg="#ffab00")
             print("Paused")
         else:
-            self.status_var.set(
-                "[ACTIVE] Live Redactor running. Controls: [Q/Esc] Quit  |  [P] Pause  |  [S] Snapshot  |  [R] Select Region"
-            )
+            self.status_var.set("[Q]uit [P]ause [S]nap [R]egion [T]opmost")
             self.status_label.configure(fg="#00e676")
             print("Resumed")
+
+    def _toggle_topmost(self) -> None:
+        """Toggle always-on-top behavior."""
+        try:
+            current = self.root.attributes("-topmost")
+            self.root.attributes("-topmost", not current)
+            state = "ON" if not current else "OFF"
+            self.status_var.set(f"Always-on-top: {state}")
+            print(f"Always-on-top: {state}")
+        except Exception:
+            pass
 
     def save_snapshot(self) -> None:
         if self.current_display_frame is not None:
@@ -676,9 +694,14 @@ class TkinterLiveViewer:
             self.current_display_frame = display_frame
             self.frame_count += 1
 
+            if not self.paused:
+                self.status_var.set(
+                    f"[{self.app.active_provider}] {timings['total_ms']:.0f}ms | {len(findings)} PII | [R]egion [P]ause [S]nap [Q]uit"
+                )
+
             # Dynamically adapt preview scale to current window dimensions (responsive to snap / resize)
-            win_w = max(320, self.root.winfo_width())
-            win_h = max(200, self.root.winfo_height() - 40)
+            win_w = max(240, self.root.winfo_width())
+            win_h = max(160, self.root.winfo_height() - 32)
             disp_h, disp_w = display_frame.shape[:2]
             scale = min(win_w / disp_w, win_h / disp_h)
             new_w, new_h = max(1, int(disp_w * scale)), max(1, int(disp_h * scale))
